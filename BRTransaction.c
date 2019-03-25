@@ -332,6 +332,7 @@ BRTransaction *BRTransactionNew(void)
     array_new(tx->outputs, 2);
     tx->lockTime = TX_LOCKTIME;
     tx->blockHeight = TX_UNCONFIRMED;
+    tx->is_dandelion = 0;
     return tx;
 }
 
@@ -347,6 +348,7 @@ BRTransaction *BRTransactionCopy(const BRTransaction *tx)
     cpy->inputs = inputs;
     cpy->outputs = outputs;
     cpy->inCount = cpy->outCount = 0;
+    cpy->is_dandelion = tx->is_dandelion;
 
     for (size_t i = 0; i < tx->inCount; i++) {
         BRTransactionAddInput(cpy, tx->inputs[i].txHash, tx->inputs[i].index, tx->inputs[i].amount,
@@ -526,7 +528,8 @@ int BRTransactionIsSigned(const BRTransaction *tx)
     assert(tx != NULL);
     
     for (size_t i = 0; tx && i < tx->inCount; i++) {
-        if (! tx->inputs[i].signature  || tx->inputs[i].sigLen == 0) return 0;
+//        if (! tx->inputs[i].signature  || tx->inputs[i].sigLen == 0) return 0;
+        if (! tx->inputs[i].signature) return 0;
     }
 
     return (tx) ? 1 : 0;

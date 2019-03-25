@@ -43,6 +43,8 @@ typedef struct {
     UInt256 hash;
     uint32_t n;
 } BRUTXO;
+    
+
 
 inline static size_t BRUTXOHash(const void *utxo)
 {
@@ -57,7 +59,7 @@ inline static int BRUTXOEq(const void *utxo, const void *otherUtxo)
 }
 
 typedef struct BRWalletStruct BRWallet;
-
+    
 // allocates and populates a BRWallet struct that must be freed by calling BRWalletFree()
 BRWallet *BRWalletNew(BRTransaction *transactions[], size_t txCount, BRMasterPubKey mpk);
 

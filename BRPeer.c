@@ -394,7 +394,7 @@ static int _BRPeerAcceptInvMessage(BRPeer *peer, const uint8_t *msg, size_t msgL
     return r;
 }
 
-static int _BRPeerAcceptTxMessage(BRPeer *peer, const uint8_t *msg, size_t msgLen)
+static int _BRPeerAcceptTxMessage(BRPeer *peer, const uint8_t *msg, size_t msgLen, int is_dandelion)
 {
     BRPeerContext *ctx = (BRPeerContext *)peer;
     BRTransaction *tx = BRTransactionParse(msg, msgLen);
@@ -545,7 +545,7 @@ static int _BRPeerAcceptGetdataMessage(BRPeer *peer, const uint8_t *msg, size_t 
                         }
                         
                         peer_log(peer, "publishing tx: %s", txHex);
-                        BRPeerSendMessage(peer, buf, bufLen, MSG_TX);
+                        BRPeerSendMessage(peer, buf, bufLen, tx->is_dandelion ? MSG_DANDELION_TX : MSG_TX);
                         break;
                     }
                     
@@ -823,7 +823,8 @@ static int _BRPeerAcceptMessage(BRPeer *peer, const uint8_t *msg, size_t msgLen,
     else if (strncmp(MSG_VERACK, type, 12) == 0) r = _BRPeerAcceptVerackMessage(peer, msg, msgLen);
     else if (strncmp(MSG_ADDR, type, 12) == 0) r = _BRPeerAcceptAddrMessage(peer, msg, msgLen);
     else if (strncmp(MSG_INV, type, 12) == 0) r = _BRPeerAcceptInvMessage(peer, msg, msgLen);
-    else if (strncmp(MSG_TX, type, 12) == 0) r = _BRPeerAcceptTxMessage(peer, msg, msgLen);
+    else if (strncmp(MSG_TX, type, 12) == 0) r = _BRPeerAcceptTxMessage(peer, msg, msgLen, 0);
+    else if (strncmp(MSG_DANDELION_TX, type, 12) == 0) r = _BRPeerAcceptTxMessage(peer, msg, msgLen, 1);
     else if (strncmp(MSG_HEADERS, type, 12) == 0) r = _BRPeerAcceptHeadersMessage(peer, msg, msgLen);
     else if (strncmp(MSG_GETADDR, type, 12) == 0) r = _BRPeerAcceptGetaddrMessage(peer, msg, msgLen);
     else if (strncmp(MSG_GETDATA, type, 12) == 0) r = _BRPeerAcceptGetdataMessage(peer, msg, msgLen);

@@ -93,6 +93,7 @@ typedef struct {
     uint32_t lockTime;
     uint32_t blockHeight;
     uint32_t timestamp; // time interval since unix epoch
+    uint8_t is_dandelion;
 } BRTransaction;
 
 // returns a newly allocated empty transaction that must be freed by calling BRTransactionFree()
