@@ -155,7 +155,8 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
     time_t now = time(NULL);
     size_t i, j;
     BRTransaction *tx, *t;
-    
+    BRTxOutput o;
+
     array_clear(wallet->utxos);
     array_clear(wallet->balanceHist);
     BRSetClear(wallet->spentOutputs);
@@ -217,8 +218,8 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
         for (j = 0; j < tx->outCount; j++) {
             if (tx->outputs[j].address[0] != '\0') {
                 BRSetAdd(wallet->usedAddrs, tx->outputs[j].address);
-                
-                if (BRSetContains(wallet->allAddrs, tx->outputs[j].address)) {
+
+                if (BRSetContains(wallet->allAddrs, tx->outputs[j].address) && !BROutIsAsset(tx->outputs[j])) {
                     array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                     balance += tx->outputs[j].amount;
                 }
@@ -227,10 +228,12 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
 
         // transaction ordering is not guaranteed, so check the entire UTXO set against the entire spent output set
         for (j = array_count(wallet->utxos); j > 0; j--) {
-            if (! BRSetContains(wallet->spentOutputs, &wallet->utxos[j - 1])) continue;
             t = BRSetGet(wallet->allTx, &wallet->utxos[j - 1].hash);
-            balance -= t->outputs[wallet->utxos[j - 1].n].amount;
-            array_rm(wallet->utxos, j - 1);
+            o = t->outputs[wallet->utxos[j - 1].n];
+            if (BRSetContains(wallet->spentOutputs, &wallet->utxos[j - 1])) {
+                balance -= o.amount;
+                array_rm(wallet->utxos, j - 1);
+            }
         }
         
         if (prevBalance < balance) wallet->totalReceived += balance - prevBalance;
@@ -239,7 +242,8 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
         prevBalance = balance;
     }
 
-    assert(array_count(wallet->balanceHist) == array_count(wallet->transactions));
+    //No longer applicable, balance is not for all transactions considering assets
+    //assert(array_count(wallet->balanceHist) == array_count(wallet->transactions));
     wallet->balance = balance;
 }
 
@@ -575,10 +579,11 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
 
     for (i = 0; outputs && i < outCount; i++) {
         assert(outputs[i].script != NULL && outputs[i].scriptLen > 0);
-        BRTransactionAddOutput(transaction, outputs[i].amount, outputs[i].script, outputs[i].scriptLen);
+        BRTransactionAddOutput(transaction, outputs[i].amount, outputs[i].script,
+                               outputs[i].scriptLen);
         amount += outputs[i].amount;
     }
-    
+
     minAmount = BRWalletMinOutputAmount(wallet);
     pthread_mutex_lock(&wallet->lock);
     feeAmount = _txFee(wallet->feePerKb, BRTransactionSize(transaction) + TX_OUTPUT_SIZE);
@@ -590,9 +595,11 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
     for (i = 0; i < array_count(wallet->utxos); i++) {
         o = &wallet->utxos[i];
         tx = BRSetGet(wallet->allTx, o);
+
         if (! tx || o->n >= tx->outCount) continue;
+        if (BROutIsAsset(tx->outputs[o->n])) continue;
         BRTransactionAddInput(transaction, tx->txHash, o->n, tx->outputs[o->n].amount,
-                              tx->outputs[o->n].script, tx->outputs[o->n].scriptLen, NULL, 0, TXIN_SEQUENCE);
+                              tx->outputs[o->n].script, tx->outputs[o->n].scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
         
         if (BRTransactionSize(transaction) + TX_OUTPUT_SIZE > TX_MAX_SIZE) { // transaction size-in-bytes too large
             BRTransactionFree(transaction);
@@ -843,7 +850,7 @@ int BRWalletTransactionIsValid(BRWallet *wallet, const BRTransaction *tx)
 
     assert(wallet != NULL);
     assert(tx != NULL && BRTransactionIsSigned(tx));
-    
+
     // TODO: XXX attempted double spends should cause conflicted tx to remain unverified until they're confirmed
     // TODO: XXX conflicted tx with the same wallet outputs should be presented as the same tx to the user
 
@@ -1219,4 +1226,67 @@ int64_t BRBitcoinAmount(int64_t localAmount, double price)
     }
     
     return (localAmount < 0) ? -amount : amount;
+}
+
+void BRFixAssetInputs(BRWallet *wallet, BRTransaction *assetTransaction)
+{
+    for (size_t j = 0; j < array_count(wallet->transactions); j++) {
+        BRTransaction *t = wallet->transactions[j];
+        for (size_t i = 0; i < array_count(assetTransaction->inputs); i++) {
+            BRTxInput input = assetTransaction->inputs[i];
+            if(UInt256Eq(input.txHash, t->txHash)){
+                BRTxOutput output = t->outputs[input.index];
+                BRTxInputSetScript(&input, output.script, output.scriptLen);
+                assetTransaction->inputs[i] = input;
+            }
+        }
+    }
+}
+
+BRUTXO * BRGetUTXO(BRWallet *wallet)
+{
+    return wallet->utxos;
+}
+
+BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
+{
+    BRTransaction *t = BRSetGet(wallet->allTx, &utxo.hash);
+    return t;
+}
+
+uint8_t BRTXContainsAsset(BRTransaction *tx)
+{
+    //Skip utxo that contain assets
+    for (int p = 0; p < tx->outCount; p++) {
+        uint8_t one = tx->outputs[p].script[0];
+        uint8_t three = tx->outputs[p].script[2];
+        uint8_t four = tx->outputs[p].script[3];
+        if (one == 106 && three == 68 && four == 65) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount) {
+    //Skip utxo that contain assets
+    for (int p = 0; p < outCount; p++) {
+        uint8_t one = outputs[p].script[0];
+        uint8_t three = outputs[p].script[2];
+        uint8_t four = outputs[p].script[3];
+        if (one == 106 && three == 68 && four == 65) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+uint8_t BROutIsAsset(const BRTxOutput output) {
+    uint8_t one = output.script[0];
+    uint8_t three = output.script[2];
+    uint8_t four = output.script[3];
+    if (one == 106 && three == 68 && four == 65) {
+        return 1;
+    }
+    return 0;
 }
