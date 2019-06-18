@@ -849,7 +849,10 @@ int BRWalletTransactionIsValid(BRWallet *wallet, const BRTransaction *tx)
     int r = 1;
 
     assert(wallet != NULL);
-    assert(tx != NULL && BRTransactionIsSigned(tx));
+    assert(tx != NULL);
+    if (!BRTransactionIsSigned(tx)) {
+        return 0;
+    }
 
     // TODO: XXX attempted double spends should cause conflicted tx to remain unverified until they're confirmed
     // TODO: XXX conflicted tx with the same wallet outputs should be presented as the same tx to the user
