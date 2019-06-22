@@ -31,6 +31,40 @@
 #include "BRInt.h"
 #include <string.h>
 
+#define wallet_log(...) _wallet_log("%s:%"PRIu16" " _va_first(__VA_ARGS__, NULL) "\n", _va_rest(__VA_ARGS__, NULL))
+#define _va_first(first, ...) first
+#define _va_rest(first, ...) __VA_ARGS__
+
+#if defined(TARGET_OS_MAC)
+#include <Foundation/Foundation.h>
+#define _wallet_log(...) NSLog(__VA_ARGS__)
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#define _wallet_log(...) __android_log_print(ANDROID_LOG_DEBUG, "digiwallet", __VA_ARGS__)
+#else
+#include <stdio.h>
+    #ifdef DEBUG
+        #define _wallet_log(...) printf(__VA_ARGS__)
+    #else
+        #define _wallet_log(...)
+    #endif
+#endif
+
+#if defined(TARGET_OS_MAC)
+    #include <Foundation/Foundation.h>
+    #define debug_log(...) NSLog(__VA_ARGS__)
+#elif defined(__ANDROID__)
+    #include <android/log.h>
+    #define debug_log(...) __android_log_print(ANDROID_LOG_DEBUG, "digiwallet", __VA_ARGS__)
+#else
+    #include <stdio.h>
+    #ifdef DEBUG
+        #define debug_log(...) printf(__VA_ARGS__)
+    #else
+        #define debug_log(...)
+    #endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -158,6 +192,8 @@ int BRWalletTransactionIsPending(BRWallet *wallet, const BRTransaction *tx);
 // true if tx is considered 0-conf safe (valid and not pending, timestamp is greater than 0, and no unverified inputs)
 int BRWalletTransactionIsVerified(BRWallet *wallet, const BRTransaction *tx);
 
+void BRFixAssetInputs(BRWallet *wallet, BRTransaction *assetTransaction);
+
 // set the block heights and timestamps for the given transactions
 // use height TX_UNCONFIRMED and timestamp 0 to indicate a tx should remain marked as unverified (not 0-conf safe)
 void BRWalletUpdateTransactions(BRWallet *wallet, const UInt256 txHashes[], size_t txCount, uint32_t blockHeight,
@@ -200,6 +236,16 @@ int64_t BRLocalAmount(int64_t amount, double price);
 // returns the given local currency amount in satoshis
 // price is local currency units (i.e. pennies, pence) per bitcoin
 int64_t BRBitcoinAmount(int64_t localAmount, double price);
+
+BRUTXO * BRGetUTXO(BRWallet *wallet);
+
+BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo);
+
+uint8_t BRTXContainsAsset(BRTransaction *tx);
+
+uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount);
+
+uint8_t BROutIsAsset(const BRTxOutput output);
 
 #ifdef __cplusplus
 }
