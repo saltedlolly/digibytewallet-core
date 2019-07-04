@@ -1927,7 +1927,7 @@ uint32_t BRPeerManagerLastBlockTimestamp(BRPeerManager *manager)
 
 // current network sync progress from 0 to 1
 // startHeight is the block height of the most recent fully completed sync
-double BRPeerManagerSyncProgress(BRPeerManager *manager, uint32_t startHeight)
+double  BRPeerManagerSyncProgress(BRPeerManager *manager, uint32_t startHeight)
 {
     double progress;
     
@@ -1940,9 +1940,9 @@ double BRPeerManagerSyncProgress(BRPeerManager *manager, uint32_t startHeight)
     }
     else if (! manager->downloadPeer || manager->lastBlock->height < manager->estimatedHeight) {
         if (manager->lastBlock->height > startHeight && manager->estimatedHeight > startHeight) {
-            progress = 0.1 + 0.9*(manager->lastBlock->height - startHeight)/(manager->estimatedHeight - startHeight);
+            progress = 0.001 + 0.999 * (manager->lastBlock->height - startHeight)/(manager->estimatedHeight - startHeight);
         }
-        else progress = 0.05;
+        else progress = 0.001;
     }
     else progress = 1.0;
 
