@@ -296,7 +296,6 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
     BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_EXTERNAL + 100, 0, 0);
     BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_INTERNAL + 100, 1, 0);
     
-
     BRSetApply(manager->orphans, NULL, _setApplyFreeBlock);
     BRSetClear(manager->orphans); // clear out orphans that may have been received on an old filter
     manager->lastOrphan = NULL;
@@ -330,6 +329,13 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
             BRBloomFilterInsertData(filter, hash.u8, sizeof(hash));
         }
     }
+    
+    for (size_t i = 0; i < addrsCount; i++) { // add addresses to watch for tx receiveing money to the wallet
+        if (BRBloomFilterContainsData(filter, addrs[i].s, strlen(addrs[i].s) * sizeof(char))) {
+            BRBloomFilterInsertData(filter, addrs[i].s, strlen(addrs[i].s) * sizeof(char));
+        }
+    }
+
 
     free(addrs);
         

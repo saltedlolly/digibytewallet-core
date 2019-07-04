@@ -323,6 +323,7 @@ size_t BRKeySegwitAddress(BRKey* key, char* addr, size_t addrLen, uint8_t segwit
     assert(key->compressed != 0);
     
     uint8_t data[91] = { '\0' };
+    char result[91] = { '\0' };
     size_t count;
     
     data[0] = segwitVersion;
@@ -331,8 +332,14 @@ size_t BRKeySegwitAddress(BRKey* key, char* addr, size_t addrLen, uint8_t segwit
     UInt160 hash = BRKeyHash160(key);
     memcpy(&data[2], &hash, 20);
     
-    count = BRBech32Encode(addr, DIGIBYTE_PUBKEY_BECH32, &data[0]);
+    count = BRBech32Encode(&result[0], DIGIBYTE_PUBKEY_BECH32, &data[0]);
     assert(count < addrLen);
+    
+    if (addr && count < addrLen)
+        // copy the result
+        memcpy(addr, &result[0], count);
+    else
+        return 0;
     
     return count;
 }
