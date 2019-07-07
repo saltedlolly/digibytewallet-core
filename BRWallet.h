@@ -121,8 +121,8 @@ void BRWalletSetCallbacks(BRWallet *wallet, void *info,
 size_t BRWalletUnusedAddrs(BRWallet *wallet, BRAddress addrs[], uint32_t gapLimit, int internal, int nativeSegwit);
 
 // returns the first unused external address
-BRAddress BRWalletReceiveAddress(BRWallet *wallet);
-
+BRAddress BRWalletReceiveAddress(BRWallet *wallet, int useSegwit);
+    
 // writes all addresses previously genereated with BRWalletUnusedAddrs() to addrs
 // returns the number addresses written, or total number available if addrs is NULL
 size_t BRWalletAllAddrs(BRWallet *wallet, BRAddress addrs[], size_t addrsCount);

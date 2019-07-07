@@ -543,11 +543,11 @@ void BRWalletSetFeePerKb(BRWallet *wallet, uint64_t feePerKb)
 }
 
 // returns the first unused external address
-BRAddress BRWalletReceiveAddress(BRWallet *wallet)
+BRAddress BRWalletReceiveAddress(BRWallet *wallet, int useSegwitAddress)
 {
     BRAddress addr = BR_ADDRESS_NONE;
     
-    BRWalletUnusedAddrs(wallet, &addr, 1, 0, 1);
+    BRWalletUnusedAddrs(wallet, &addr, 1, 0, useSegwitAddress);
     return addr;
 }
 
