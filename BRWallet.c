@@ -178,12 +178,17 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
 
     for (i = 0; i < array_count(wallet->transactions); i++) {
         tx = wallet->transactions[i];
+        
+        if (i > 90) {
+            printf("%d\n", i);
+        }
 
         // check if any inputs are invalid or already spent
         if (tx->blockHeight == TX_UNCONFIRMED) {
             for (j = 0, isInvalid = 0; ! isInvalid && j < tx->inCount; j++) {
                 if (BRSetContains(wallet->spentOutputs, &tx->inputs[j]) ||
-                    BRSetContains(wallet->invalidTx, &tx->inputs[j].txHash)) isInvalid = 1;
+                    BRSetContains(wallet->invalidTx, &tx->inputs[j].txHash))
+                    isInvalid = 1;
             }
         
             if (isInvalid) {
@@ -232,7 +237,11 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
                 if (BRSetContains(wallet->allAddrs, tx->outputs[j].address) && !BRTXContainsAsset(tx)) {
                     array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                     balance += tx->outputs[j].amount;
+                } else {
+                    printf("Address is missing or something\n");
                 }
+            } else {
+                balance += 0;
             }
         }
 
@@ -253,7 +262,7 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
     }
 
     //No longer applicable, balance is not for all transactions considering assets
-    //assert(array_count(wallet->balanceHist) == array_count(wallet->transactions));
+    assert(array_count(wallet->balanceHist) == array_count(wallet->transactions));
     wallet->balance = balance;
 }
 
@@ -296,6 +305,8 @@ BRWallet *BRWalletNew(BRTransaction *transactions[], size_t txCount, BRMasterPub
     
     BRWalletUnusedAddrs(wallet, NULL, SEQUENCE_GAP_LIMIT_EXTERNAL, 0, 1);
     BRWalletUnusedAddrs(wallet, NULL, SEQUENCE_GAP_LIMIT_INTERNAL, 1, 1);
+    BRWalletUnusedAddrs(wallet, NULL, SEQUENCE_GAP_LIMIT_EXTERNAL, 0, 0);
+    BRWalletUnusedAddrs(wallet, NULL, SEQUENCE_GAP_LIMIT_INTERNAL, 1, 0);
     _BRWalletUpdateBalance(wallet);
 
     if (txCount > 0 && ! _BRWalletContainsTx(wallet, transactions[0])) { // verify transactions match master pubKey
