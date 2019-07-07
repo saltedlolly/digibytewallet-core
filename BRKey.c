@@ -327,10 +327,10 @@ size_t BRKeySegwitAddress(BRKey* key, char* addr, size_t addrLen, uint8_t segwit
     size_t count;
     
     data[0] = segwitVersion;
-    data[1] = 20; // ripemd160
+    data[1] = sizeof(UInt160); // ripemd160
     
     UInt160 hash = BRKeyHash160(key);
-    memcpy(&data[2], &hash, 20);
+    memcpy(&data[2], &hash, sizeof(UInt160));
     
     count = BRBech32Encode(&result[0], DIGIBYTE_PUBKEY_BECH32, &data[0]);
     assert(count < addrLen);

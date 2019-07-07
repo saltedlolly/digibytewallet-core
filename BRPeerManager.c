@@ -320,7 +320,7 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
     filter = BRBloomFilterNew(manager->fpRate, addrsCount + utxosCount + txCount + 100, (uint32_t) BRPeerHash(peer),
                               BLOOM_UPDATE_ALL); // BUG: XXX txCount not the same as number of spent wallet outputs
     
-    for (size_t i = 0; i < addrsCount; i++) { // add addresses to watch for tx receiveing money to the wallet
+    for (size_t i = 0; i < addrsCount; i++) { // add addresses to watch for tx receiving money to the wallet
         UInt160 hash = UINT160_ZERO;
         
         BRAddressHash160(&hash, addrs[i].s);
@@ -329,13 +329,6 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
             BRBloomFilterInsertData(filter, hash.u8, sizeof(hash));
         }
     }
-    
-    for (size_t i = 0; i < addrsCount; i++) { // add addresses to watch for tx receiveing money to the wallet
-        if (BRBloomFilterContainsData(filter, addrs[i].s, strlen(addrs[i].s) * sizeof(char))) {
-            BRBloomFilterInsertData(filter, addrs[i].s, strlen(addrs[i].s) * sizeof(char));
-        }
-    }
-
 
     free(addrs);
         
@@ -1025,12 +1018,25 @@ static void _peerRelayedTx(void *info, BRTransaction *tx)
         if (manager->bloomFilter != NULL) { // check if bloom filter is already being updated
             BRAddress addrs[SEQUENCE_GAP_LIMIT_EXTERNAL + SEQUENCE_GAP_LIMIT_INTERNAL];
             UInt160 hash;
-
+            
             // the transaction likely consumed one or more wallet addresses, so check that at least the next <gap limit>
             // unused addresses are still matched by the bloom filter
+            BRWalletUnusedAddrs(manager->wallet, addrs, SEQUENCE_GAP_LIMIT_EXTERNAL, 0, 0);
+            BRWalletUnusedAddrs(manager->wallet, addrs + SEQUENCE_GAP_LIMIT_EXTERNAL, SEQUENCE_GAP_LIMIT_INTERNAL, 1, 0);
+
+            for (size_t i = 0; i < SEQUENCE_GAP_LIMIT_EXTERNAL + SEQUENCE_GAP_LIMIT_INTERNAL; i++) {
+                if (! BRAddressHash160(&hash, addrs[i].s) ||
+                    BRBloomFilterContainsData(manager->bloomFilter, hash.u8, sizeof(hash))) continue;
+                if (manager->bloomFilter) BRBloomFilterFree(manager->bloomFilter);
+                manager->bloomFilter = NULL; // reset bloom filter so it's recreated with new wallet addresses
+                _BRPeerManagerUpdateFilter(manager);
+                break;
+            }
+            
+            // Do the same for segwit addresses again
             BRWalletUnusedAddrs(manager->wallet, addrs, SEQUENCE_GAP_LIMIT_EXTERNAL, 0, 1);
             BRWalletUnusedAddrs(manager->wallet, addrs + SEQUENCE_GAP_LIMIT_EXTERNAL, SEQUENCE_GAP_LIMIT_INTERNAL, 1, 1);
-
+            
             for (size_t i = 0; i < SEQUENCE_GAP_LIMIT_EXTERNAL + SEQUENCE_GAP_LIMIT_INTERNAL; i++) {
                 if (! BRAddressHash160(&hash, addrs[i].s) ||
                     BRBloomFilterContainsData(manager->bloomFilter, hash.u8, sizeof(hash))) continue;

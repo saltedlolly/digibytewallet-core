@@ -26,6 +26,7 @@
 #include "BRSet.h"
 #include "BRAddress.h"
 #include "BRArray.h"
+#include "BRBech32.h"
 #include <stdlib.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -52,8 +53,10 @@ struct BRWalletStruct {
 
 inline static uint64_t _txFee(uint64_t feePerKb, size_t size)
 {
-    uint64_t standardFee = ((size + 999)/1000)*TX_FEE_PER_KB, // standard fee based on tx size rounded up to nearest kb
-             fee = (((size*feePerKb/1000) + 99)/100)*100; // fee using feePerKb, rounded up to nearest 100 satoshi
+    // standard fee based on tx size
+    uint64_t standardFee = size*TX_FEE_PER_KB/1000,
+    // fee using feePerKb, rounded up to nearest 100 satoshi
+    fee = (((size*feePerKb/1000) + 99)/100)*100;
     
     return (fee > standardFee) ? fee : standardFee;
 }
@@ -126,6 +129,12 @@ static int _BRWalletContainsTx(BRWallet *wallet, const BRTransaction *tx)
     
     for (size_t i = 0; ! r && i < tx->outCount; i++) {
         if (BRSetContains(wallet->allAddrs, tx->outputs[i].address)) r = 1;
+//        else if (tx->outputs[i].scriptLen == 22) {
+//            // try to extract P2WPKH (?)
+//            char address[91];
+//            BRBech32Encode(&address[0], DIGIBYTE_PUBKEY_BECH32, tx->outputs[i].script);
+//            if (BRSetContains(wallet->allAddrs, &address[0])) r = 1;
+//        }
     }
     
     for (size_t i = 0; ! r && i < tx->inCount; i++) {
@@ -631,10 +640,7 @@ BRTransaction *BRWalletCreateTransaction(BRWallet *wallet, uint64_t amount, cons
     return BRWalletCreateTxForOutputs(wallet, &o, 1);
 }
 
-// returns an unsigned transaction that satisifes the given transaction outputs
-// result must be freed by calling BRTransactionFree()
-BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput outputs[], size_t outCount)
-{
+BRTransaction *BRWalletCreateTxForOutputsEx(BRWallet *wallet, const BRTxOutput outputs[], size_t outCount, int force) {
     BRTransaction *tx, *transaction = BRTransactionNew();
     uint64_t feeAmount, amount = 0, balance = 0, minAmount;
     size_t i, j, cpfpSize = 0;
@@ -643,17 +649,17 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
     
     assert(wallet != NULL);
     assert(outputs != NULL && outCount > 0);
-
+    
     for (i = 0; outputs && i < outCount; i++) {
         assert(outputs[i].script != NULL && outputs[i].scriptLen > 0);
         BRTransactionAddOutput(transaction, outputs[i].amount, outputs[i].script,
                                outputs[i].scriptLen);
         amount += outputs[i].amount;
     }
-
+    
     minAmount = BRWalletMinOutputAmount(wallet);
     pthread_mutex_lock(&wallet->lock);
-    feeAmount = _txFee(wallet->feePerKb, BRTransactionSize(transaction) + TX_OUTPUT_SIZE);
+    feeAmount = _txFee(wallet->feePerKb, BRTransactionVSize(transaction) + TX_OUTPUT_SIZE);
     
     // TODO: use up all UTXOs for all used addresses to avoid leaving funds in addresses whose public key is revealed
     // TODO: avoid combining addresses in a single transaction when possible to reduce information leakage
@@ -662,21 +668,21 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
     for (i = 0; i < array_count(wallet->utxos); i++) {
         o = &wallet->utxos[i];
         tx = BRSetGet(wallet->allTx, o);
-
+        
         if (! tx || o->n >= tx->outCount) continue;
         if (BROutIsAsset(tx->outputs[o->n])) continue;
         BRTransactionAddInput(transaction, tx->txHash, o->n, tx->outputs[o->n].amount,
                               tx->outputs[o->n].script, tx->outputs[o->n].scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
         
-        if (BRTransactionSize(transaction) + TX_OUTPUT_SIZE > TX_MAX_SIZE) { // transaction size-in-bytes too large
+        if (BRTransactionVSize(transaction) + TX_OUTPUT_SIZE > TX_MAX_SIZE) { // transaction size-in-bytes too large
             BRTransactionFree(transaction);
             transaction = NULL;
-        
+            
             // check for sufficient total funds before building a smaller transaction
             if (wallet->balance < amount + _txFee(wallet->feePerKb, 10 + array_count(wallet->utxos)*TX_INPUT_SIZE +
                                                   (outCount + 1)*TX_OUTPUT_SIZE + cpfpSize)) break;
             pthread_mutex_unlock(&wallet->lock);
-
+            
             if (outputs[outCount - 1].amount > amount + feeAmount + minAmount - balance) {
                 BRTxOutput newOutputs[outCount];
                 
@@ -688,7 +694,7 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
                 transaction = BRWalletCreateTxForOutputs(wallet, newOutputs, outCount);
             }
             else transaction = BRWalletCreateTxForOutputs(wallet, outputs, outCount - 1); // remove last output
-
+            
             balance = amount = feeAmount = 0;
             pthread_mutex_lock(&wallet->lock);
             break;
@@ -696,14 +702,14 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
         
         balance += tx->outputs[o->n].amount;
         
-//        // size of unconfirmed, non-change inputs for child-pays-for-parent fee
-//        // don't include parent tx with more than 10 inputs or 10 outputs
-//        if (tx->blockHeight == TX_UNCONFIRMED && tx->inCount <= 10 && tx->outCount <= 10 &&
-//            ! _BRWalletTxIsSend(wallet, tx)) cpfpSize += BRTransactionSize(tx);
-
+        //        // size of unconfirmed, non-change inputs for child-pays-for-parent fee
+        //        // don't include parent tx with more than 10 inputs or 10 outputs
+        //        if (tx->blockHeight == TX_UNCONFIRMED && tx->inCount <= 10 && tx->outCount <= 10 &&
+        //            ! _BRWalletTxIsSend(wallet, tx)) cpfpSize += BRTransactionSize(tx);
+        
         // fee amount after adding a change output
-        feeAmount = _txFee(wallet->feePerKb, BRTransactionSize(transaction) + TX_OUTPUT_SIZE + cpfpSize);
-
+        feeAmount = _txFee(wallet->feePerKb, BRTransactionVSize(transaction) + TX_OUTPUT_SIZE + cpfpSize);
+        
         // increase fee to round off remaining wallet balance to nearest 100 satoshi
         if (wallet->balance > amount + feeAmount) feeAmount += (wallet->balance - (amount + feeAmount)) % 100;
         
@@ -712,7 +718,7 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
     
     pthread_mutex_unlock(&wallet->lock);
     
-    if (transaction && (outCount < 1 || balance < amount + feeAmount)) { // no outputs/insufficient funds
+    if (transaction && (outCount < 1 || balance < amount + feeAmount) && !force) { // no outputs/insufficient funds
         BRTransactionFree(transaction);
         transaction = NULL;
     }
@@ -720,12 +726,25 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
         BRWalletUnusedAddrs(wallet, &addr, 1, 1, 1);
         uint8_t script[BRAddressScriptPubKey(NULL, 0, addr.s)];
         size_t scriptLen = BRAddressScriptPubKey(script, sizeof(script), addr.s);
-    
+        
         BRTransactionAddOutput(transaction, balance - (amount + feeAmount), script, scriptLen);
         BRTransactionShuffleOutputs(transaction);
     }
     
     return transaction;
+}
+
+// returns an unsigned transaction that satisifes the given transaction outputs, without going to fail due to missing balance
+// result must be freed by calling BRTransactionFree()
+BRTransaction *BRWalletForceCreateTxForOutputs(BRWallet *wallet, const BRTxOutput outputs[], size_t outCount) {
+    return BRWalletCreateTxForOutputsEx(wallet, outputs, outCount, 1);
+}
+
+// returns an unsigned transaction that satisifes the given transaction outputs
+// result must be freed by calling BRTransactionFree()
+BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput outputs[], size_t outCount)
+{
+    return BRWalletCreateTxForOutputsEx(wallet, outputs, outCount, 0);
 }
 
 // signs any inputs in tx that can be signed using private keys from the wallet
@@ -743,8 +762,16 @@ int BRWalletSignTransaction(BRWallet *wallet, BRTransaction *tx, int forkId, con
     pthread_mutex_lock(&wallet->lock);
     
     for (i = 0; tx && i < tx->inCount; i++) {
+        for (j = (uint32_t)array_count(wallet->internalChainSegwit); j > 0; j--) {
+            if (BRAddressEq(tx->inputs[i].address, &wallet->internalChainSegwit[j - 1])) internalIdx[internalCount++] = j - 1;
+        }
+        
         for (j = (uint32_t)array_count(wallet->internalChain); j > 0; j--) {
             if (BRAddressEq(tx->inputs[i].address, &wallet->internalChain[j - 1])) internalIdx[internalCount++] = j - 1;
+        }
+        
+        for (j = (uint32_t)array_count(wallet->externalChainSegwit); j > 0; j--) {
+            if (BRAddressEq(tx->inputs[i].address, &wallet->externalChainSegwit[j - 1])) externalIdx[externalCount++] = j - 1;
         }
 
         for (j = (uint32_t)array_count(wallet->externalChain); j > 0; j--) {
@@ -1187,6 +1214,30 @@ uint64_t BRWalletFeeForTxAmount(BRWallet *wallet, uint64_t amount)
     BRTxOutputSetScript(&o, dummyScript, sizeof(dummyScript)); // unspendable dummy scriptPubKey
     tx = BRWalletCreateTxForOutputs(wallet, &o, 1);
 
+    if (tx) {
+        fee = BRWalletFeeForTx(wallet, tx);
+        BRTransactionFree(tx);
+    }
+    
+    return fee;
+}
+
+// fee that will be added for a transaction of the given amount (forcing transaction creation)
+uint64_t BRWalletForceFeeForTxAmount(BRWallet *wallet, uint64_t amount)
+{
+    static const uint8_t dummyScript[] = { OP_DUP, OP_HASH160, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, OP_EQUALVERIFY, OP_CHECKSIG };
+    BRTxOutput o = BR_TX_OUTPUT_NONE;
+    BRTransaction *tx;
+    uint64_t fee = 0, maxAmount = 0;
+    
+    assert(wallet != NULL);
+    assert(amount > 0);
+    maxAmount = BRWalletMaxOutputAmount(wallet);
+    o.amount = (amount < maxAmount) ? amount : maxAmount;
+    BRTxOutputSetScript(&o, dummyScript, sizeof(dummyScript)); // unspendable dummy scriptPubKey
+    tx = BRWalletForceCreateTxForOutputs(wallet, &o, 1);
+    
     if (tx) {
         fee = BRWalletFeeForTx(wallet, tx);
         BRTransactionFree(tx);
