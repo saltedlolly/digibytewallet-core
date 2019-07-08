@@ -280,7 +280,7 @@ size_t BRAddressFromScriptPubKey(char *addr, size_t addrLen, const uint8_t *scri
     }
     else if (count == 3 && *elems[0] == OP_HASH160 && *elems[1] == 20 && *elems[2] == OP_EQUAL) {
         // pay-to-script-hash scriptPubKey
-        data[0] = DIGIBYTE_PUBKEY_LEGACY;
+        data[0] = DIGIBYTE_SCRIPT_ADDRESS;
 #if BITCOIN_TESTNET
         data[0] = BITCOIN_SCRIPT_ADDRESS_TEST;
 #endif
@@ -319,13 +319,17 @@ size_t BRAddressFromScriptSig(char *addr, size_t addrLen, const uint8_t *script,
     if (! script || scriptLen == 0 || scriptLen > MAX_SCRIPT_LENGTH) return 0;
     
     uint8_t data[21];
-    const uint8_t *elems[BRScriptElements(NULL, 0, script, scriptLen)], *d = NULL;
-    size_t count = BRScriptElements(elems, sizeof(elems)/sizeof(*elems), script, scriptLen), l = 0;
-
+    const uint8_t *d = NULL, *elems[BRScriptElements(NULL, 0, script, scriptLen)];
+    size_t l = 0, count = BRScriptElements(elems, sizeof(elems)/sizeof(*elems), script, scriptLen);
+    
     data[0] = DIGIBYTE_PUBKEY_LEGACY;
 #if BITCOIN_TESTNET
     data[0] = BITCOIN_PUBKEY_ADDRESS_TEST;
 #endif
+    
+    if (*elems[0] == OP_HASH160) {
+        int a = 1 + 1;
+    }
     
     if (count >= 2 && *elems[count - 2] <= OP_PUSHDATA4 &&
         (*elems[count - 1] == 65 || *elems[count - 1] == 33)) { // pay-to-pubkey-hash scriptSig
@@ -347,7 +351,8 @@ size_t BRAddressFromScriptSig(char *addr, size_t addrLen, const uint8_t *script,
     }
     // pay-to-witness scriptSig's are empty
     
-    return (d) ? BRBase58CheckEncode(addr, addrLen, data, sizeof(data)) : 0;
+    size_t ret  = (d) ? BRBase58CheckEncode(addr, addrLen, data, 21) : 0;
+    return ret;
 }
 
 // writes the bitcoin address for a witness to addr
@@ -410,7 +415,7 @@ size_t BRAddressScriptPubKey(uint8_t *script, size_t scriptLen, const char *addr
     return r;
 }
 
-// returns true if addr is a valid bitcoin address
+// returns true if addr is a valid digibyte address
 int BRAddressIsValid(const char *addr)
 {
     uint8_t data[42];
