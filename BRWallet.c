@@ -215,17 +215,22 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
         // TODO: don't add outputs below TX_MIN_OUTPUT_AMOUNT
         // TODO: don't add coin generation outputs < 100 blocks deep
         // NOTE: balance/UTXOs will then need to be recalculated when last block changes
+        uint8_t containsAsset = BRTXContainsAsset(tx);
+        
         for (j = 0; j < tx->outCount; j++) {
             if (tx->outputs[j].address[0] != '\0') {
                 BRSetAdd(wallet->usedAddrs, tx->outputs[j].address);
-
-                if (BRSetContains(wallet->allAddrs, tx->outputs[j].address) && !BROutpointIsAsset(&tx->outputs[j])) {
+                
+                if (BRSetContains(wallet->allAddrs, tx->outputs[j].address)) {
+                    // If the tx contains an asset, we will skip the DUST transactions,
+                    // otherwise there would be a chance of burning the received assets.
+                    // Hence, skip adding the 600 dsatoshi transactions to the utxos.
+                    if (containsAsset && tx->outputs[j].amount <= DA_ASSET_DUST_AMOUNT) continue;
                     array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                     balance += tx->outputs[j].amount;
                 }
             }
         }
-
         // transaction ordering is not guaranteed, so check the entire UTXO set against the entire spent output set
         for (j = array_count(wallet->utxos); j > 0; j--) {
             t = BRSetGet(wallet->allTx, &wallet->utxos[j - 1].hash);
