@@ -226,6 +226,8 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
                     // otherwise there would be a chance of burning the received assets.
                     // Hence, skip adding the 600 dsatoshi transactions to the utxos.
                     if (containsAsset && tx->outputs[j].amount <= DA_ASSET_DUST_AMOUNT) continue;
+                    
+                    // Add the UTXO to the internal list of utxos and add the balance
                     array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                     balance += tx->outputs[j].amount;
                 }
