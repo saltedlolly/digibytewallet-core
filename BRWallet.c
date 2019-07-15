@@ -1259,7 +1259,23 @@ BRTransaction* BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
 
 uint8_t BRTXContainsAsset(BRTransaction *tx)
 {
+<<<<<<< HEAD
     return BRContainsAsset(tx->outputs, tx->outCount);
+=======
+    //Skip utxo that contain assets
+    for (int p = 0; p < tx->outCount; p++) {
+        BRTxOutput o = tx->outputs[p];
+        if (o.script) {
+            uint8_t one = o.script[0];
+            uint8_t three = o.script[2];
+            uint8_t four = o.script[3];
+            if (one == 106 && three == 68 && four == 65) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+>>>>>>> e339643... Merge branch 'master' of https://github.com/nseidm1/digibytewallet-core into segwit
 }
 
 uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount)
