@@ -230,7 +230,7 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
             if (tx->outputs[j].address[0] != '\0') {
                 BRSetAdd(wallet->usedAddrs, tx->outputs[j].address);
 
-                if (BRSetContains(wallet->allAddrs, tx->outputs[j].address) && !BRTXContainsAsset(tx)) {
+                if (BRSetContains(wallet->allAddrs, tx->outputs[j].address) && !BROutpointIsAsset(&tx->outputs[j])) {
                     array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                     balance += tx->outputs[j].amount;
                 } else {
