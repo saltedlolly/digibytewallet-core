@@ -1375,12 +1375,12 @@ void BRFixAssetInputs(BRWallet *wallet, BRTransaction *assetTransaction)
     }
 }
 
-BRUTXO * BRGetUTXO(BRWallet *wallet)
+BRUTXO* BRGetUTXO(BRWallet *wallet)
 {
     return wallet->utxos;
 }
 
-BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
+BRTransaction* BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
 {
     BRTransaction *t = BRSetGet(wallet->allTx, &utxo.hash);
     return t;
@@ -1388,40 +1388,34 @@ BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
 
 uint8_t BRTXContainsAsset(BRTransaction *tx)
 {
-    //Skip utxo that contain assets
-    for (int p = 0; p < tx->outCount; p++) {
-        BRTxOutput o = tx->outputs[p];
-        if (o.script) {
-            uint8_t one = o.script[0];
-            uint8_t three = o.script[2];
-            uint8_t four = o.script[3];
-            if (one == 106 && three == 68 && four == 65) {
-                return 1;
-            }
-        }
-    }
+    return BRContainsAsset(tx->outputs, tx->outCount);
+}
+
+uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount)
+{
+    for (int p = 0; p < outCount; p++)
+        if (BROutIsAsset(&outputs[p])) return 1;
     return 0;
 }
 
-uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount) {
-    //Skip utxo that contain assets
-    for (int p = 0; p < outCount; p++) {
-        uint8_t one = outputs[p].script[0];
-        uint8_t three = outputs[p].script[2];
-        uint8_t four = outputs[p].script[3];
-        if (one == 106 && three == 68 && four == 65) {
-            return 1;
-        }
-    }
-    return 0;
+uint8_t BRTestProtocolTag(const uint8_t* ptr, const char* check) {
+    if (ptr == NULL || check == NULL) return 0;
+    return (*ptr == check[0] && *(ptr + 1) == check[1]);
 }
 
-uint8_t BROutIsAsset(const BRTxOutput output) {
-    uint8_t one = output.script[0];
-    uint8_t three = output.script[2];
-    uint8_t four = output.script[3];
-    if (one == 106 && three == 68 && four == 65) {
-        return 1;
-    }
-    return 0;
+uint8_t BROutpointIsAsset(const BRTxOutput* output)
+    uint8_t* ptr = output->script;
+    if (output->scriptLen <= 6 || !output->script) return 0;
+    if (*ptr != OP_RETURN) return 0;
+    ++ptr;
+
+    uint8_t length = *ptr;
+    if (length == 0) return 0;
+    ++ptr;
+
+    if (!BRTestProtocolTag(ptr, "DA")) return 0;
+    ++ptr;
+
+    if (*ptr == 0x02) return 0;
+    return length;
 }
