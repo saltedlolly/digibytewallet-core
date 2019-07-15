@@ -1492,3 +1492,15 @@ uint8_t BRDecodeAsset(const BRTxOutput* output, BRAssetData* data) {
     
     return 1;
 }
+
+BRTransaction* BRGetTransactions(BRWallet *wallet)
+{
+    return *wallet->transactions;
+}
+
+uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output)
+{
+    if (BROutpointIsAsset(&output) > 0) return 0;
+    if (BRSetContains(wallet->spentOutputs, &output)) return 0;
+    return 1;
+}
