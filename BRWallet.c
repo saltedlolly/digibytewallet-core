@@ -1183,7 +1183,7 @@ uint64_t BRWalletBalanceAfterTx(BRWallet *wallet, const BRTransaction *tx)
     uint64_t balance;
     
     assert(wallet != NULL);
-    assert(tx != NULL && BRTransactionIsSigned(tx));
+    assert(tx != NULL/* && BRTransactionIsSigned(tx)*/);
     pthread_mutex_lock(&wallet->lock);
     balance = wallet->balance;
     
@@ -1390,11 +1390,14 @@ uint8_t BRTXContainsAsset(BRTransaction *tx)
 {
     //Skip utxo that contain assets
     for (int p = 0; p < tx->outCount; p++) {
-        uint8_t one = tx->outputs[p].script[0];
-        uint8_t three = tx->outputs[p].script[2];
-        uint8_t four = tx->outputs[p].script[3];
-        if (one == 106 && three == 68 && four == 65) {
-            return 1;
+        BRTxOutput o = tx->outputs[p];
+        if (o.script) {
+            uint8_t one = o.script[0];
+            uint8_t three = o.script[2];
+            uint8_t four = o.script[3];
+            if (one == 106 && three == 68 && four == 65) {
+                return 1;
+            }
         }
     }
     return 0;
