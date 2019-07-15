@@ -1403,8 +1403,11 @@ uint8_t BRDecodeAsset(const BRTxOutput* output, BRAssetData* data) {
     return 1;
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 8445ef2... Yoshis asset mods (2)
 =======
+=======
+>>>>>>> 09ec9a0... Merge pull request #5 from nseidm1/remotes/SmartArray/segwit
 
 BRTransaction* BRGetTransactions(BRWallet *wallet)
 {
@@ -1417,4 +1420,7 @@ uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output)
     if (BRSetContains(wallet->spentOutputs, &output)) return 0;
     return 1;
 }
+<<<<<<< HEAD
 >>>>>>> f98cedc... Asset JNI updates
+=======
+>>>>>>> 09ec9a0... Merge pull request #5 from nseidm1/remotes/SmartArray/segwit
