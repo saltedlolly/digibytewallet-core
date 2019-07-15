@@ -294,6 +294,10 @@ uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount);
 
 uint8_t BROutpointIsAsset(const BRTxOutput* output);
 
+BRTransaction* BRGetTransactions(BRWallet *wallet);
+
+uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output);
+
 #ifdef __cplusplus
 }
 #endif
