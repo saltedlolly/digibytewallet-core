@@ -1266,23 +1266,7 @@ BRTransaction* BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
 
 uint8_t BRTXContainsAsset(BRTransaction *tx)
 {
-<<<<<<< HEAD
     return BRContainsAsset(tx->outputs, tx->outCount);
-=======
-    //Skip utxo that contain assets
-    for (int p = 0; p < tx->outCount; p++) {
-        BRTxOutput o = tx->outputs[p];
-        if (o.script) {
-            uint8_t one = o.script[0];
-            uint8_t three = o.script[2];
-            uint8_t four = o.script[3];
-            if (one == 106 && three == 68 && four == 65) {
-                return 1;
-            }
-        }
-    }
-    return 0;
->>>>>>> e339643... Merge branch 'master' of https://github.com/nseidm1/digibytewallet-core into segwit
 }
 
 uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount)
@@ -1292,24 +1276,10 @@ uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount)
     return 0;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-uint8_t BROutIsAsset(const BRTxOutput output) {
-    uint8_t one = output.script[0];
-    uint8_t three = output.script[2];
-    uint8_t four = output.script[3];
-    if (one == 106 && three == 68 && four == 65) {
-        return 1;
-    }
-    return 0;
-}
-=======
-=======
 /* (internal)
  * Tests the protocol tag of an asset.
  * Returns 1 if the test was successful, otherwise it returns zero.
  */
->>>>>>> 8445ef2... Yoshis asset mods (2)
 uint8_t BRTestProtocolTag(const uint8_t* ptr, const char* check) {
     if (ptr == NULL || check == NULL) return 0;
     return (*ptr == check[0] && *(ptr + 1) == check[1]);
@@ -1340,9 +1310,6 @@ uint8_t BROutpointIsAsset(const BRTxOutput* output)
 //    if (*ptr == 0x02) return 0;
     return length;
 }
-<<<<<<< HEAD
->>>>>>> c16bca2... Yoshis asset mods
-=======
 
 /*
  * Returns 1 if asset was decoded correctly, otherwise zero.
@@ -1402,12 +1369,6 @@ uint8_t BRDecodeAsset(const BRTxOutput* output, BRAssetData* data) {
     
     return 1;
 }
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> 8445ef2... Yoshis asset mods (2)
-=======
-=======
->>>>>>> 09ec9a0... Merge pull request #5 from nseidm1/remotes/SmartArray/segwit
 
 BRTransaction* BRGetTransactions(BRWallet *wallet)
 {
@@ -1420,7 +1381,3 @@ uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output)
     if (BRSetContains(wallet->spentOutputs, &output)) return 0;
     return 1;
 }
-<<<<<<< HEAD
->>>>>>> f98cedc... Asset JNI updates
-=======
->>>>>>> 09ec9a0... Merge pull request #5 from nseidm1/remotes/SmartArray/segwit
