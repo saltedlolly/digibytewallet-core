@@ -1377,7 +1377,8 @@ BRTransaction* BRGetTransactions(BRWallet *wallet)
 
 uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output)
 {
-    if (BROutpointIsAsset(&output) > 0) return 0;
+    if (BROutpointIsAsset(&output)) return 0;
     if (BRSetContains(wallet->spentOutputs, &output)) return 0;
+    if (output.amount <= DA_ASSET_DUST_AMOUNT) return 0;
     return 1;
 }
