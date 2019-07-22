@@ -1034,5 +1034,7 @@ void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output)
     uint32_t key = OdoKey(nTime);
     
     Odocrypt_Init(odo, key);
-    Odocrypt_Hash(odo, input, input + 80, (char*) output);
+    //Odocrypt_Hash(odo, input, input + 80, (char*) output);
+    
+    free(odo);
 }

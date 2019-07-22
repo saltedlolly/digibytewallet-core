@@ -276,8 +276,9 @@ void Odocrypt_Init(OdoStruct* odo, uint32_t key) {
     }
     
     // Randomize each round key
-    for (int i = 0; i < ROUNDS; i++)
+    for (int i = 0; i < ROUNDS; i++) {
         odo->RoundKey[i] = OdoRandom_Next(&random, 1 << STATE_SIZE);
+    }
 }
 
 int Odocrypt_Hash(OdoStruct* odo, const char* pbegin, const char* pend, char* output)
