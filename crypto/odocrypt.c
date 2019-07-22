@@ -131,7 +131,8 @@ void OdoCrypt_ApplyRotations(uint64_t* state, const int* rotations)
     uint64_t next[STATE_SIZE];
     
     // rotate memcpy (rotate by one)
-    // @Mental: Please check this. Alternatively I would make a loop
+    // @Mental: Please check this. Alternatively, I would achieve it with a loop.
+    // Original: std::rotate_copy(state, state+1, state+STATE_SIZE, next);
     memcpy(next, state + 1, STATE_SIZE - 1);
     next[STATE_SIZE - 1 - 1] = state[0];
     
