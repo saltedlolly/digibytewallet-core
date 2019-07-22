@@ -223,10 +223,10 @@ void OdoRandom_Permutation64(OdoRandom* random, uint64_t* arr, size_t sz) {
 }
 
 void Odocrypt_Init(OdoStruct* odo, uint32_t key) {
-    OdoRandom r;
-    r.current = key;
-    r.multiplicand = 1;
-    r.addend = 0;
+    OdoRandom random;
+    random.current = key;
+    random.multiplicand = 1;
+    random.addend = 0;
     
     odo->key = key;
     
