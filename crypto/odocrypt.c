@@ -171,7 +171,6 @@ void OdoCrypt_Encrypt(OdoStruct* odo, char* cipher, const char* plain) {
 // a standard LCG.  This ensures that every seed produces a unique sequence.
 uint32_t OdoRandom_NextInt(OdoRandom* random)
 {
-    assert(random != NULL && "OdoRandom struct not initialized");
     random->addend += random->multiplicand * BASE_ADDEND;
     random->multiplicand *= BASE_MULTIPLICAND;
     random->current = random->current * random->multiplicand + random->addend;
@@ -223,6 +222,8 @@ void OdoRandom_Permutation64(OdoRandom* random, uint64_t* arr, size_t sz) {
 }
 
 void Odocrypt_Init(OdoStruct* odo, uint32_t key) {
+    assert(odo != NULL && "OdoStruct must be initialized before calling Odocrypt_Init");
+    
     OdoRandom random;
     random.current = key;
     random.multiplicand = 1;

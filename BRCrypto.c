@@ -1028,9 +1028,11 @@ uint32_t OdoKey(uint32_t nTime)
 
 void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output)
 {
-    OdoStruct odo;
+    OdoStruct* odo = calloc(1, sizeof(OdoStruct));
+    assert(odo != NULL && "Could not allocate OdoStruct");
+    
     uint32_t key = OdoKey(nTime);
     
-    Odocrypt_Init(&odo, key);
-    Odocrypt_Hash(&odo, input, input + 80, (char*) output);
+    Odocrypt_Init(odo, key);
+    Odocrypt_Hash(odo, input, input + 80, (char*) output);
 }
