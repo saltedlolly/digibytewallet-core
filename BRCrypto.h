@@ -25,6 +25,8 @@
 #ifndef BRCrypto_h
 #define BRCrypto_h
 
+#include "crypto/odocrypt.h"
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <inttypes.h>
@@ -33,7 +35,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+    
 
+    
 // sha-1 - not recommended for cryptographic use
 void BRSHA1(void *md20, const void *data, size_t len);
 
@@ -101,6 +105,8 @@ void BRSkein(const char* input, char* output);
 void BRGroestl(const char* input, char* output);
 
 void BRQubit(const char* input, char* output);
+    
+void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output);
 
 // zeros out memory in a way that can't be optimized out by the compiler
 inline static void mem_clean(void *ptr, size_t len)
