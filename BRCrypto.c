@@ -1023,18 +1023,14 @@ uint32_t OdoKey(uint32_t nTime)
 {
     uint32_t nOdoShapechangeInterval = ODOCRYPT_CHAPECHANGE_INTERVAL;
     return nTime - nTime % nOdoShapechangeInterval;
-    
 }
 
 void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output)
 {
-    OdoStruct* odo = calloc(1, sizeof(OdoStruct));
-    assert(odo != NULL && "Could not allocate OdoStruct");
+    OdoStruct odo; // sizeof(OdoStruct) = 167288 => stack safe
     
     uint32_t key = OdoKey(nTime);
     
-    //Odocrypt_Init(odo, key);
-    //Odocrypt_Hash(odo, input, input + 80, (char*) output);
-    
-    free(odo);
+    Odocrypt_Init(&odo, key);
+    Odocrypt_Hash(&odo, input, input + 80, (char*) output);
 }
