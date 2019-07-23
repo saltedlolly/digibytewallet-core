@@ -103,7 +103,7 @@ void OdoCrypt_Pack(const uint64_t* state, char* bytes)
     }
 }
 
-void OdoCrypt_ApplySboxes(uint64_t* state, const uint8_t** sbox1, const uint16_t** sbox2)
+void OdoCrypt_ApplySboxes(uint64_t* state, size_t sz1, size_t sz2, const uint8_t sbox1[][sz1], const uint16_t sbox2[][sz2])
 {
     const static uint64_t MASK1 = (1 << SMALL_SBOX_WIDTH) - 1;
     const static uint64_t MASK2 = (1 << LARGE_SBOX_WIDTH) - 1;
@@ -130,11 +130,9 @@ void OdoCrypt_ApplyRotations(uint64_t* state, const int* rotations)
 {
     uint64_t next[STATE_SIZE];
     
-    // rotate memcpy (rotate by one)
-    // @Mental: Please check this. Alternatively, I would achieve it with a loop.
-    // Original: std::rotate_copy(state, state+1, state+STATE_SIZE, next);
-    memcpy(next, state + 1, STATE_SIZE - 1);
-    next[STATE_SIZE - 1 - 1] = state[0];
+    for (int i = 1; i < STATE_SIZE; i++)
+        next[i-1] = state[i];
+    next[STATE_SIZE-1] = state[0];
     
     for (int i = 0; i < STATE_SIZE; i++)
         for (int j = 0; j < ROTATION_COUNT; j++)
@@ -158,7 +156,7 @@ void OdoCrypt_Encrypt(OdoStruct* odo, char* cipher, const char* plain) {
     for (int round = 0; round < ROUNDS; round++)
     {
         OdoCrypt_ApplyPbox(state, &odo->Permutation[0]);
-        OdoCrypt_ApplySboxes(state, odo->Sbox1, odo->Sbox2);
+        OdoCrypt_ApplySboxes(state, 1 << SMALL_SBOX_WIDTH, 1 << LARGE_SBOX_WIDTH, odo->Sbox1, odo->Sbox2);
         OdoCrypt_ApplyPbox(state, &odo->Permutation[1]);
         OdoCrypt_ApplyRotations(state, odo->Rotations);
         OdoCrypt_ApplyRoundKey(state, odo->RoundKey[round]);
@@ -193,6 +191,7 @@ void OdoRandom_Permutation8(OdoRandom* random, uint8_t* arr, size_t sz) {
         arr[i] = i;
     
     for (size_t i = 1; i < sz; i++) {
+        // swap
         uint8_t tmp = arr[OdoRandom_Next(random, i+1)];
         arr[OdoRandom_Next(random, i+1)] = arr[i];
         arr[i] = tmp;
@@ -210,20 +209,24 @@ void OdoRandom_Permutation16(OdoRandom* random, uint16_t* arr, size_t sz) {
     }
 }
 
-void OdoRandom_Permutation64(OdoRandom* random, uint64_t* arr, size_t sz) {
+void OdoRandom_Permutation(OdoRandom* random, int* arr, size_t sz) {
     for (size_t i = 0; i < sz; i++)
         arr[i] = i;
     
     for (size_t i = 1; i < sz; i++) {
-        uint64_t tmp = arr[OdoRandom_Next(random, i+1)];
+        int tmp = arr[OdoRandom_Next(random, i+1)];
         arr[OdoRandom_Next(random, i+1)] = arr[i];
         arr[i] = tmp;
     }
 }
 
+#include <stdio.h>
+
 void Odocrypt_Init(OdoStruct* odo, uint32_t key) {
     assert(odo != NULL && "OdoStruct must be initialized before calling Odocrypt_Init");
     
+    printf("odo = %zu\n", sizeof(OdoStruct));
+
     OdoRandom random;
     random.current = key;
     random.multiplicand = 1;
@@ -257,8 +260,8 @@ void Odocrypt_Init(OdoStruct* odo, uint32_t key) {
     // Rotations must be distinct, non-zero, and have odd sum
     {
         int bits[WORD_BITS-1];
-        OdoRandom_Permutation64(&random, bits, WORD_BITS-1);
-        
+        OdoRandom_Permutation(&random, bits, WORD_BITS-1);
+
         int sum = 0;
         for (int j = 0; j < ROTATION_COUNT-1; j++)
         {
