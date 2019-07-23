@@ -26,6 +26,7 @@
 #include "crypto/groestl.h"
 #include "crypto/skein.h"
 #include "crypto/qubit.h"
+#include "crypto/odocrypt.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1014,4 +1015,26 @@ void BRGroestl(const char* input, char* output){
 
 void BRQubit(const char* input, char* output) {
     qubit_hash(input, output);
+}
+
+/* Odocrypt hashing functions and helpers */
+
+uint32_t OdoKey(uint32_t nTime)
+{
+    uint32_t nOdoShapechangeInterval = ODOCRYPT_CHAPECHANGE_INTERVAL;
+    return nTime - nTime % nOdoShapechangeInterval;
+    
+}
+
+void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output)
+{
+    OdoStruct* odo = calloc(1, sizeof(OdoStruct));
+    assert(odo != NULL && "Could not allocate OdoStruct");
+    
+    uint32_t key = OdoKey(nTime);
+    
+    //Odocrypt_Init(odo, key);
+    //Odocrypt_Hash(odo, input, input + 80, (char*) output);
+    
+    free(odo);
 }
