@@ -35,7 +35,7 @@ const static int WORD_BITS = 64;
 const static int DIGEST_BITS = 8 * ODOCRYPT_DIGEST_SIZE;
 const static int STATE_SIZE = DIGEST_BITS / WORD_BITS;
 const static int SMALL_SBOX_COUNT = DIGEST_BITS / (SMALL_SBOX_WIDTH + LARGE_SBOX_WIDTH);
-const static int LARGE_SBOX_COUNT = ODOCRYPT_DIGEST_SIZE;
+const static int LARGE_SBOX_COUNT = STATE_SIZE;
 
 typedef struct {
     uint64_t mask[PBOX_SUBROUNDS][STATE_SIZE/2];
@@ -61,6 +61,7 @@ const static uint64_t BASE_MULTIPLICAND = 6364136223846793005ull;
 const static uint64_t BASE_ADDEND = 1442695040888963407ull;
 
 int Odocrypt_Hash(OdoStruct* odo, const char* pbegin, const char* pend, char* output);
+void OdoCrypt_Encrypt(OdoStruct* odo, char* cipher, const char* plain);
 void Odocrypt_Init(OdoStruct* odo, uint32_t key);
 
 #endif

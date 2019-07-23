@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "crypto/sha3/brg_endian.h"
+#include "brg_endian.h"
 #ifdef KeccakReference
 #include "displayIntermediateValues.h"
 #endif

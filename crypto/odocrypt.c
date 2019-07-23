@@ -151,7 +151,7 @@ void OdoCrypt_ApplyRoundKey(uint64_t* state, int roundKey)
 
 void OdoCrypt_Encrypt(OdoStruct* odo, char* cipher, const char* plain) {
     uint64_t state[STATE_SIZE];
-    OdoCrypt_Unpack(state, plain);
+    OdoCrypt_Unpack(&state[0], plain);
     OdoCrypt_PreMix(state);
     for (int round = 0; round < ROUNDS; round++)
     {
@@ -192,8 +192,9 @@ void OdoRandom_Permutation8(OdoRandom* random, uint8_t* arr, size_t sz) {
     
     for (size_t i = 1; i < sz; i++) {
         // swap
-        uint8_t tmp = arr[OdoRandom_Next(random, i+1)];
-        arr[OdoRandom_Next(random, i+1)] = arr[i];
+        int r = OdoRandom_Next(random, i+1);
+        uint8_t tmp = arr[r];
+        arr[r] = arr[i];
         arr[i] = tmp;
     }
 }
@@ -203,8 +204,9 @@ void OdoRandom_Permutation16(OdoRandom* random, uint16_t* arr, size_t sz) {
         arr[i] = i;
     
     for (size_t i = 1; i < sz; i++) {
-        uint16_t tmp = arr[OdoRandom_Next(random, i+1)];
-        arr[OdoRandom_Next(random, i+1)] = arr[i];
+        int r = OdoRandom_Next(random, i+1);
+        uint16_t tmp = arr[r];
+        arr[r] = arr[i];
         arr[i] = tmp;
     }
 }
@@ -214,8 +216,9 @@ void OdoRandom_Permutation(OdoRandom* random, int* arr, size_t sz) {
         arr[i] = i;
     
     for (size_t i = 1; i < sz; i++) {
-        int tmp = arr[OdoRandom_Next(random, i+1)];
-        arr[OdoRandom_Next(random, i+1)] = arr[i];
+        int r = OdoRandom_Next(random, i+1);
+        int tmp = arr[r];
+        arr[r] = arr[i];
         arr[i] = tmp;
     }
 }
@@ -224,8 +227,6 @@ void OdoRandom_Permutation(OdoRandom* random, int* arr, size_t sz) {
 
 void Odocrypt_Init(OdoStruct* odo, uint32_t key) {
     assert(odo != NULL && "OdoStruct must be initialized before calling Odocrypt_Init");
-    
-    printf("odo = %zu\n", sizeof(OdoStruct));
 
     OdoRandom random;
     random.current = key;
@@ -292,12 +293,12 @@ int Odocrypt_Hash(OdoStruct* odo, const char* pbegin, const char* pend, char* ou
     size_t len = (pend - pbegin) * sizeof(pbegin[0]);
     assert(len <= ODOCRYPT_DIGEST_SIZE);
     assert(ODOCRYPT_DIGEST_SIZE < KeccakP800_stateSizeInBytes);
-    memcpy(cipher, (const void*) (&pbegin[0]), len);
+    memcpy(cipher, (const void*) pbegin, len * sizeof(char));
     cipher[len] = 1;
     
     OdoCrypt_Encrypt(odo, cipher, cipher);
     KeccakP800_Permute_12rounds(cipher);
-    memcpy(output, cipher, 32);
+    memcpy(output, cipher, 32 * sizeof(char));
     
     return 1;
 }

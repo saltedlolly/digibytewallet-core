@@ -1023,7 +1023,6 @@ uint32_t OdoKey(uint32_t nTime)
 {
     uint32_t nOdoShapechangeInterval = ODOCRYPT_CHAPECHANGE_INTERVAL;
     return nTime - nTime % nOdoShapechangeInterval;
-    
 }
 
 void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output)
