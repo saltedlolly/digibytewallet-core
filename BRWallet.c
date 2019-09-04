@@ -1382,3 +1382,7 @@ uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output)
     if (output.amount <= DA_ASSET_DUST_AMOUNT) return 0;
     return 1;
 }
+
+void BRWalletUpdateBalance(BRWallet *wallet) {
+    _BRWalletUpdateBalance(wallet);
+}

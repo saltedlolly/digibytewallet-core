@@ -294,6 +294,8 @@ BRTransaction* BRGetTransactions(BRWallet *wallet);
 
 uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output);
 
+void BRWalletUpdateBalance(BRWallet *wallet);
+
 #ifdef __cplusplus
 }
 #endif
