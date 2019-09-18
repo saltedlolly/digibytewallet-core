@@ -170,7 +170,11 @@ BRMerkleBlock *BRMerkleBlockParse(const uint8_t *buf, size_t bufLen)
                 break;
                 
             default:
+#if DEBUG
                 assert(0 && "Invalid algorithm");
+#else
+                break;
+#endif
         }
     }
     

@@ -1688,7 +1688,7 @@ int BRTransactionTests()
     size_t scriptLen = BRAddressScriptPubKey(script, sizeof(script), address.s);
     BRTransaction *tx = BRTransactionNew();
     
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
     BRTransactionAddOutput(tx, 100000000, script, scriptLen);
     BRTransactionAddOutput(tx, 4900000000, script, scriptLen);
     
@@ -1726,16 +1726,16 @@ int BRTransactionTests()
     BRTransactionFree(tx);
     
     tx = BRTransactionNew();
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
     BRTransactionAddOutput(tx, 1000000, script, scriptLen);
     BRTransactionAddOutput(tx, 1000000, script, scriptLen);
     BRTransactionAddOutput(tx, 1000000, script, scriptLen);
@@ -1769,8 +1769,8 @@ int BRTransactionTests()
     BRTransactionFree(tx);
 
     BRTransaction *src = BRTransactionNew ();
-    BRTransactionAddInput(src, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
-    BRTransactionAddInput(src, inHash, 0, 1, script, scriptLen, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(src, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(src, inHash, 0, 1, script, scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
     BRTransactionAddOutput(src, 1000000, script, scriptLen);
     BRTransactionAddOutput(src, 1000000, script, scriptLen);
     BRTransactionAddOutput(src, 1000000, script, scriptLen);
@@ -1853,7 +1853,7 @@ int BRWalletTests()
     size_t outScriptLen = BRAddressScriptPubKey(outScript, sizeof(outScript), recvAddr.s);
     
     tx = BRTransactionNew();
-    BRTransactionAddInput(tx, inHash, 0, 1, inScript, inScriptLen, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, inScript, inScriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
     BRTransactionAddOutput(tx, SATOSHIS, outScript, outScriptLen);
 //    BRWalletRegisterTransaction(w, tx); // test adding unsigned tx
 //    if (BRWalletBalance(w) != 0)
@@ -1875,7 +1875,7 @@ int BRWalletTests()
         r = 0, fprintf(stderr, "***FAILED*** %s: BRWalletRegisterTransaction() test 3\n", __func__);
 
     tx = BRTransactionNew();
-    BRTransactionAddInput(tx, inHash, 1, 1, inScript, inScriptLen, NULL, 0, TXIN_SEQUENCE - 1);
+    BRTransactionAddInput(tx, inHash, 1, 1, inScript, inScriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE - 1);
     BRTransactionAddOutput(tx, SATOSHIS, outScript, outScriptLen);
     tx->lockTime = 1000;
     BRTransactionSign(tx, 0, &k, 1);
@@ -1893,7 +1893,7 @@ int BRWalletTests()
 
     BRWalletFree(w);
     tx = BRTransactionNew();
-    BRTransactionAddInput(tx, inHash, 0, 1, inScript, inScriptLen, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, inScript, inScriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
     BRTransactionAddOutput(tx, SATOSHIS, outScript, outScriptLen);
     BRTransactionSign(tx, 0, &k, 1);
     tx->timestamp = 1;
@@ -1954,7 +1954,7 @@ int BRWalletTests()
     int64_t amt;
     
     tx = BRTransactionNew();
-    BRTransactionAddInput(tx, inHash, 0, 1, inScript, inScriptLen, NULL, 0, TXIN_SEQUENCE);
+    BRTransactionAddInput(tx, inHash, 0, 1, inScript, inScriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
     BRTransactionAddOutput(tx, 740000, outScript, outScriptLen);
     BRTransactionSign(tx, 0, &k, 1);
     w = BRWalletNew(&tx, 1, mpk);
@@ -2151,6 +2151,87 @@ int BRMerkleBlockTests()
 
     if (b) BRMerkleBlockFree(b);
     return r;
+}
+
+int TestOdo(uint32_t key, const char* in, char* out) {
+    OdoStruct odo;
+    UInt256 output;
+    
+    char cipher[100] = { '\0' };
+    size_t len = 80 * sizeof(in[0]);
+    assert(len <= ODOCRYPT_DIGEST_SIZE);
+    memcpy(cipher, (const void*) in, len * sizeof(char));
+    cipher[len] = 1;
+    
+    Odocrypt_Init(&odo, key);
+    OdoCrypt_Encrypt(&odo, cipher, cipher);
+    
+    char cipher_hex[100] = { '\0' };
+    for (int i = 0; i < 80; i++) {
+        sprintf(&cipher_hex[i*2], "%02x", (uint8_t) cipher[i]);
+    }
+    
+    int i;
+    if ((i = strncmp(&cipher_hex[0], out, 80)) == 0) {
+        return 1;
+    } else {
+        fprintf(stderr, "***FAILED*** %s: TestOdo() (key=%d)\n\t result  => %s\n\t example == %s\n\t i = %d\n",
+            __func__,
+            key,
+            &cipher_hex[0],
+            out,
+            i
+        );
+        return 0;
+    }
+}
+
+void LongTestString(char* output)
+{
+    char* ret = output;
+    
+    int c = 0;
+    for (int i = 0; i < 200000; i++) {
+        ret[c++] = (unsigned char)(i);
+        ret[c++] = (unsigned char)(i >> 4);
+        ret[c++] = (unsigned char)(i >> 8);
+        ret[c++] = (unsigned char)(i >> 12);
+        ret[c++] = (unsigned char)(i >> 16);
+    }
+    
+    ret[c] = '\0';
+}
+
+// taken and adapted from https://github.com/breadwallet/breadwallet-core/blob/master/bitcoin/test.c
+int BROdocryptTests()
+{
+    char* test1 = malloc((200000 * 5 + 1) * sizeof(char));
+    LongTestString(test1);
+    
+    int r = 0;
+    
+    r |= !TestOdo(0, "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "9724ebfef40d7808bc21b212d8645a1df4d7fc4a0d91ee8e7f747ca1383eaeb1bb264b3a3b1b1f19"
+            "a8d458616e9a19572e3ceb2f58773076e829a288c8fdb61ab619ffaa84a4ee752fea52dbb359620e");
+    r |= !TestOdo(1, "00000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "c659c70bd9335a0bec67e526cdf99569543ca7e258fad19d439fb8ada1bc68efa5553d270d236cf0"
+            "3b1c179c684cfc93ae15b3c239c11e384303785cc0d828114c28e08091f42ec707aba712fe999c68");
+    r |= !TestOdo(0x80808080u, "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopqopqrpqrsqrstrstustuvtuvw",
+            "dc5d9757b16bfa425f527817ee88a070595a662474d06bb96b439e25bc3097fc7068ab9d934fcd19"
+            "c9587478dd9ab8f79f2c85175c51e49306135e561561725b0aa7a44366a1135ff93194da22d1e9ba");
+    r |= !TestOdo(0x12345678, "As DigiByte relies on 80 byte header hashes, we want to have an example for that",
+            "13dddebb0d65daa0f3e4a5bd9a1b74af7ca5a7b32ef118fb1684b200e377ce504346adcd2354e818"
+            "bf530dd870386104f706f4fecde1cec5cee804aae2569821aa5b2db3ac048607be36714e2bce48c6");
+    r |= !TestOdo(1729, &test1[0x4ffb0],
+            "de79362f40cf0c755b21cf30798fa828b21cba61222ebeccc5a1ee385183ff2a981926403529080f"
+            "6c5a650bb299770222e7dbc0bdd559f479fac21d08044d306513067f2bf6accdb8b55942a5430e1c");
+    r |= !TestOdo(0xD59, "Mora labelled me Unknown Sample, which the overseer translated as Odo'ital......",
+            "a7dd19a7fcdf3b7c0a8da1765553d903ff42687fe2f36c3930b82d7a68e426a90f49f1fc4b06263d"
+            "cf95d70a1b436337586955ef61c976f97785da2d2c8144b6767f824d53dd518c2cfdce1e9bd74fe1");
+    
+    free(test1);
+    
+    return !r;
 }
 
 int BRPaymentProtocolTests()
@@ -2651,6 +2732,8 @@ int BRRunTests()
     printf("%s\n", (BRPaymentProtocolTests()) ? "success" : (fail++, "***FAIL***"));
     printf("BRPaymentProtocolEncryptionTests... ");
     printf("%s\n", (BRPaymentProtocolEncryptionTests()) ? "success" : (fail++, "***FAIL***"));
+    printf("OdocryptTests... ");
+    printf("%s\n", (BROdocryptTests()) ? "success" : (fail++, "***FAIL***"));
     printf("\n");
     
     if (fail > 0) printf("%d TEST FUNCTION(S) ***FAILED***\n", fail);
