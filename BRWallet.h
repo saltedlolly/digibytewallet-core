@@ -260,7 +260,7 @@ int64_t BRBitcoinAmount(int64_t localAmount, double price);
 #define DA_TYPE_SHA1_NO_META_LOCKED   0x05
 #define DA_TYPE_SHA1_NO_META_UNLOCKED 0x06
 
-#define DA_ASSET_DUST_AMOUNT 1600
+#define DA_ASSET_DUST_AMOUNT 700
 
 typedef enum {
     DA_UNDEFINED,
