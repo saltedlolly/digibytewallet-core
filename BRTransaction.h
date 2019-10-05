@@ -27,6 +27,7 @@
 
 #include "BRKey.h"
 #include "BRInt.h"
+#include "BRAssetData.h"
 #include <stddef.h>
 #include <inttypes.h>
 
@@ -66,6 +67,8 @@ typedef struct {
     uint8_t *witness;
     size_t witLen;
     uint32_t sequence;
+    BRAssetData* digiAssets;
+    size_t assetCount;
 } BRTxInput;
 
 void BRTxInputSetAddress(BRTxInput *input, const char *address);
@@ -98,6 +101,8 @@ typedef struct {
     uint32_t blockHeight;
     uint32_t timestamp; // time interval since unix epoch
     uint8_t is_dandelion;
+//    BRAssetData* digiassets;
+//    size_t assetCount;
 } BRTransaction;
 
 // returns a newly allocated empty transaction that must be freed by calling BRTransactionFree()
