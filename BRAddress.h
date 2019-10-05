@@ -88,10 +88,14 @@ size_t BRScriptPushData(uint8_t *script, size_t scriptLen, const uint8_t *data, 
 const uint8_t *BRScriptPKH(const uint8_t *script, size_t scriptLen);
 
 typedef struct {
-    char s[36];
+    char s[76]; // 73 bytes + 3 bytes for hrp (dgb)
 } BRAddress;
 
-#define BR_ADDRESS_NONE ((BRAddress) { "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" })
+#define BR_ADDRESS_NONE ((BRAddress) { \
+    "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" \
+    "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0" \
+    "\0\0\0\0\0" \
+})
 
 // writes the bitcoin address for a scriptPubKey to addr
 // returns the number of bytes written, or addrLen needed if addr is NULL

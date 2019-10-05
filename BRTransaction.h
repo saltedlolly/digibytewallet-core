@@ -57,7 +57,7 @@ uint32_t BRRand(uint32_t upperBound);
 typedef struct {
     UInt256 txHash;
     uint32_t index;
-    char address[36];
+    char address[44];
     uint64_t amount;
     uint8_t *script;
     size_t scriptLen;
@@ -74,7 +74,7 @@ void BRTxInputSetSignature(BRTxInput *input, const uint8_t *signature, size_t si
 void BRTxInputSetWitness(BRTxInput *input, const uint8_t *witness, size_t witLen);
 
 typedef struct {
-    char address[36];
+    char address[44];
     uint64_t amount;
     uint8_t *script;
     size_t scriptLen;

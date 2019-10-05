@@ -29,6 +29,8 @@
 #include "BRKey.h"
 #include "BRAddress.h"
 #include "BRBase58.h"
+#include "BRBech32.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -313,6 +315,33 @@ size_t BRKeyAddress(BRKey *key, char *addr, size_t addrLen)
     else addrLen = 0;
     
     return addrLen;
+}
+
+// writes the pay-to-witness-pubkeyhash address for key to addr
+// returns the number of bytes written, or addrLen needed if addr is NULL
+size_t BRKeySegwitAddress(BRKey* key, char* addr, size_t addrLen, uint8_t segwitVersion) {
+    assert(key->compressed != 0);
+    
+    uint8_t data[91] = { '\0' };
+    char result[91] = { '\0' };
+    size_t count;
+    
+    data[0] = segwitVersion;
+    data[1] = sizeof(UInt160); // ripemd160
+    
+    UInt160 hash = BRKeyHash160(key);
+    memcpy(&data[2], &hash, sizeof(UInt160));
+    
+    count = BRBech32Encode(&result[0], DIGIBYTE_PUBKEY_BECH32, &data[0]);
+    assert(count < addrLen);
+    
+    if (addr && count < addrLen)
+        // copy the result
+        memcpy(addr, &result[0], count);
+    else
+        return 0;
+    
+    return count;
 }
 
 // signs md with key and writes signature to sig
