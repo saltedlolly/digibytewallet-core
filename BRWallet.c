@@ -155,7 +155,8 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
     time_t now = time(NULL);
     size_t i, j;
     BRTransaction *tx, *t;
-    
+    BRTxOutput o;
+
     array_clear(wallet->utxos);
     array_clear(wallet->balanceHist);
     BRSetClear(wallet->spentOutputs);
@@ -214,23 +215,32 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
         // TODO: don't add outputs below TX_MIN_OUTPUT_AMOUNT
         // TODO: don't add coin generation outputs < 100 blocks deep
         // NOTE: balance/UTXOs will then need to be recalculated when last block changes
+        uint8_t containsAsset = BRTXContainsAsset(tx);
+        
         for (j = 0; j < tx->outCount; j++) {
             if (tx->outputs[j].address[0] != '\0') {
                 BRSetAdd(wallet->usedAddrs, tx->outputs[j].address);
                 
                 if (BRSetContains(wallet->allAddrs, tx->outputs[j].address)) {
+                    // If the tx contains an asset, we will skip the DUST transactions,
+                    // otherwise there would be a chance of burning the received assets.
+                    // Hence, skip adding the 600 dsatoshi transactions to the utxos.
+                    if (containsAsset && tx->outputs[j].amount <= DA_ASSET_DUST_AMOUNT) continue;
+                    
+                    // Add the UTXO to the internal list of utxos and add the balance
                     array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                     balance += tx->outputs[j].amount;
                 }
             }
         }
-
         // transaction ordering is not guaranteed, so check the entire UTXO set against the entire spent output set
         for (j = array_count(wallet->utxos); j > 0; j--) {
-            if (! BRSetContains(wallet->spentOutputs, &wallet->utxos[j - 1])) continue;
             t = BRSetGet(wallet->allTx, &wallet->utxos[j - 1].hash);
-            balance -= t->outputs[wallet->utxos[j - 1].n].amount;
-            array_rm(wallet->utxos, j - 1);
+            o = t->outputs[wallet->utxos[j - 1].n];
+            if (BRSetContains(wallet->spentOutputs, &wallet->utxos[j - 1])) {
+                balance -= o.amount;
+                array_rm(wallet->utxos, j - 1);
+            }
         }
         
         if (prevBalance < balance) wallet->totalReceived += balance - prevBalance;
@@ -239,7 +249,8 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
         prevBalance = balance;
     }
 
-    assert(array_count(wallet->balanceHist) == array_count(wallet->transactions));
+    //No longer applicable, balance is not for all transactions considering assets
+    //assert(array_count(wallet->balanceHist) == array_count(wallet->transactions));
     wallet->balance = balance;
 }
 
@@ -575,10 +586,11 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
 
     for (i = 0; outputs && i < outCount; i++) {
         assert(outputs[i].script != NULL && outputs[i].scriptLen > 0);
-        BRTransactionAddOutput(transaction, outputs[i].amount, outputs[i].script, outputs[i].scriptLen);
+        BRTransactionAddOutput(transaction, outputs[i].amount, outputs[i].script,
+                               outputs[i].scriptLen);
         amount += outputs[i].amount;
     }
-    
+
     minAmount = BRWalletMinOutputAmount(wallet);
     pthread_mutex_lock(&wallet->lock);
     feeAmount = _txFee(wallet->feePerKb, BRTransactionSize(transaction) + TX_OUTPUT_SIZE);
@@ -590,9 +602,11 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
     for (i = 0; i < array_count(wallet->utxos); i++) {
         o = &wallet->utxos[i];
         tx = BRSetGet(wallet->allTx, o);
+
         if (! tx || o->n >= tx->outCount) continue;
+        if (BROutpointIsAsset(&tx->outputs[o->n])) continue;
         BRTransactionAddInput(transaction, tx->txHash, o->n, tx->outputs[o->n].amount,
-                              tx->outputs[o->n].script, tx->outputs[o->n].scriptLen, NULL, 0, TXIN_SEQUENCE);
+                              tx->outputs[o->n].script, tx->outputs[o->n].scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
         
         if (BRTransactionSize(transaction) + TX_OUTPUT_SIZE > TX_MAX_SIZE) { // transaction size-in-bytes too large
             BRTransactionFree(transaction);
@@ -842,8 +856,11 @@ int BRWalletTransactionIsValid(BRWallet *wallet, const BRTransaction *tx)
     int r = 1;
 
     assert(wallet != NULL);
-    assert(tx != NULL && BRTransactionIsSigned(tx));
-    
+    assert(tx != NULL);
+    if (!BRTransactionIsSigned(tx)) {
+        return 0;
+    }
+
     // TODO: XXX attempted double spends should cause conflicted tx to remain unverified until they're confirmed
     // TODO: XXX conflicted tx with the same wallet outputs should be presented as the same tx to the user
 
@@ -1068,7 +1085,7 @@ uint64_t BRWalletBalanceAfterTx(BRWallet *wallet, const BRTransaction *tx)
     uint64_t balance;
     
     assert(wallet != NULL);
-    assert(tx != NULL && BRTransactionIsSigned(tx));
+    assert(tx != NULL/* && BRTransactionIsSigned(tx)*/);
     pthread_mutex_lock(&wallet->lock);
     balance = wallet->balance;
     
@@ -1219,4 +1236,148 @@ int64_t BRBitcoinAmount(int64_t localAmount, double price)
     }
     
     return (localAmount < 0) ? -amount : amount;
+}
+
+void BRFixAssetInputs(BRWallet *wallet, BRTransaction *assetTransaction)
+{
+    for (size_t j = 0; j < array_count(wallet->transactions); j++) {
+        BRTransaction *t = wallet->transactions[j];
+        for (size_t i = 0; i < array_count(assetTransaction->inputs); i++) {
+            BRTxInput input = assetTransaction->inputs[i];
+            if(UInt256Eq(input.txHash, t->txHash)){
+                BRTxOutput output = t->outputs[input.index];
+                BRTxInputSetScript(&input, output.script, output.scriptLen);
+                assetTransaction->inputs[i] = input;
+            }
+        }
+    }
+}
+
+BRUTXO* BRGetUTXO(BRWallet *wallet)
+{
+    return wallet->utxos;
+}
+
+BRTransaction* BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
+{
+    BRTransaction *t = BRSetGet(wallet->allTx, &utxo.hash);
+    return t;
+}
+
+uint8_t BRTXContainsAsset(BRTransaction *tx)
+{
+    return BRContainsAsset(tx->outputs, tx->outCount);
+}
+
+uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount)
+{
+    for (int p = 0; p < outCount; p++)
+        if (BROutpointIsAsset(&outputs[p])) return 1;
+    return 0;
+}
+
+/* (internal)
+ * Tests the protocol tag of an asset.
+ * Returns 1 if the test was successful, otherwise it returns zero.
+ */
+uint8_t BRTestProtocolTag(const uint8_t* ptr, const char* check) {
+    if (ptr == NULL || check == NULL) return 0;
+    return (*ptr == check[0] && *(ptr + 1) == check[1]);
+}
+
+/*
+ * Returns zero if an outpoint is no asset, otherwise
+ * returns the length of the asset's data
+ */
+uint8_t BROutpointIsAsset(const BRTxOutput* output)
+{
+    uint8_t* ptr;
+    uint8_t length;
+
+    if (output->scriptLen <= 6 || !output->script) return 0;
+    ptr = output->script;
+
+    if (*ptr != OP_RETURN) return 0;
+    ++ptr;
+
+    length = *ptr;
+    if (length == 0 || length + 2 > output->scriptLen) return 0;
+    ++ptr;
+
+    if (!BRTestProtocolTag(ptr, "DA")) return 0;
+    ++ptr;
+
+//    if (*ptr == 0x02) return 0;
+    return length;
+}
+
+/*
+ * Returns 1 if asset was decoded correctly, otherwise zero.
+ */
+uint8_t BRDecodeAsset(const BRTxOutput* output, BRAssetData* data) {
+    uint8_t* ptr;
+    uint8_t length;
+    uint8_t type;
+
+    if (output == NULL || data == NULL) return 0;
+    if (!(length = BROutpointIsAsset(output))) return 0;
+    ptr = output->script + 4; /* OP_RETURN + LEN + TAG */
+    
+    memset(data, 0, sizeof(BRAssetData));
+    
+    data->version = *ptr;
+    ptr++;
+    
+    type = *ptr;
+    
+    if (DA_IS_ISSUANCE(type)) {
+        data->type = DA_ISSUANCE;
+    } else if (DA_IS_TRANSFER(type)) {
+        data->type = DA_TRANSFER;
+    } else if (DA_IS_BURN(type)) {
+        data->type = DA_BURN;
+    }
+    
+    /*
+     * Note that a buffer length check was performed in
+     * BROutpointIsAsset.
+     */
+    if (type & DA_TYPE_SHA1_META_SHA256) {
+        assert(length == 2 + 1 + 20 + 32 && "Invalid length");
+        memcpy(&data->info_hash[0], ptr, 20);
+        memcpy(&data->metadata[0], ptr, 32);
+        data->has_infohash = 1;
+        data->has_metadata = 1;
+        
+    } else if (type & DA_TYPE_SHA1_MS12_SHA256) {
+        
+    } else if (type & DA_TYPE_SHA1_MS13_SHA256) {
+        
+    } else if (type & DA_TYPE_SHA1_META) {
+        assert(length == 2 + 1 + 20 && "Invalid length");
+        memcpy(&data->info_hash[0], ptr, 20);
+        data->has_infohash = 1;
+        
+    } else if (type & DA_TYPE_SHA1_NO_META_LOCKED) {
+        data->locked = 1;
+        
+    } else if (type & DA_TYPE_SHA1_NO_META_UNLOCKED) {
+        data->locked = 0;
+        
+    } else {
+    }
+    
+    return 1;
+}
+
+BRTransaction* BRGetTransactions(BRWallet *wallet)
+{
+    return *wallet->transactions;
+}
+
+uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output)
+{
+    if (BROutpointIsAsset(&output) > 0) return 0;
+    if (BRSetContains(wallet->spentOutputs, &output)) return 0;
+    return 1;
 }

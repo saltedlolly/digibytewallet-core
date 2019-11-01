@@ -31,6 +31,40 @@
 #include "BRInt.h"
 #include <string.h>
 
+#define wallet_log(...) _wallet_log("%s:%"PRIu16" " _va_first(__VA_ARGS__, NULL) "\n", _va_rest(__VA_ARGS__, NULL))
+#define _va_first(first, ...) first
+#define _va_rest(first, ...) __VA_ARGS__
+
+#if defined(TARGET_OS_MAC)
+#include <Foundation/Foundation.h>
+#define _wallet_log(...) NSLog(__VA_ARGS__)
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#define _wallet_log(...) __android_log_print(ANDROID_LOG_DEBUG, "digiwallet", __VA_ARGS__)
+#else
+#include <stdio.h>
+    #ifdef DEBUG
+        #define _wallet_log(...) printf(__VA_ARGS__)
+    #else
+        #define _wallet_log(...)
+    #endif
+#endif
+
+#if defined(TARGET_OS_MAC)
+    #include <Foundation/Foundation.h>
+    #define debug_log(...) NSLog(__VA_ARGS__)
+#elif defined(__ANDROID__)
+    #include <android/log.h>
+    #define debug_log(...) __android_log_print(ANDROID_LOG_DEBUG, "digiwallet", __VA_ARGS__)
+#else
+    #include <stdio.h>
+    #ifdef DEBUG
+        #define debug_log(...) printf(__VA_ARGS__)
+    #else
+        #define debug_log(...)
+    #endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,6 +77,8 @@ typedef struct {
     UInt256 hash;
     uint32_t n;
 } BRUTXO;
+    
+
 
 inline static size_t BRUTXOHash(const void *utxo)
 {
@@ -57,7 +93,7 @@ inline static int BRUTXOEq(const void *utxo, const void *otherUtxo)
 }
 
 typedef struct BRWalletStruct BRWallet;
-
+    
 // allocates and populates a BRWallet struct that must be freed by calling BRWalletFree()
 BRWallet *BRWalletNew(BRTransaction *transactions[], size_t txCount, BRMasterPubKey mpk);
 
@@ -156,6 +192,8 @@ int BRWalletTransactionIsPending(BRWallet *wallet, const BRTransaction *tx);
 // true if tx is considered 0-conf safe (valid and not pending, timestamp is greater than 0, and no unverified inputs)
 int BRWalletTransactionIsVerified(BRWallet *wallet, const BRTransaction *tx);
 
+void BRFixAssetInputs(BRWallet *wallet, BRTransaction *assetTransaction);
+
 // set the block heights and timestamps for the given transactions
 // use height TX_UNCONFIRMED and timestamp 0 to indicate a tx should remain marked as unverified (not 0-conf safe)
 void BRWalletUpdateTransactions(BRWallet *wallet, const UInt256 txHashes[], size_t txCount, uint32_t blockHeight,
@@ -198,6 +236,63 @@ int64_t BRLocalAmount(int64_t amount, double price);
 // returns the given local currency amount in satoshis
 // price is local currency units (i.e. pennies, pence) per bitcoin
 int64_t BRBitcoinAmount(int64_t localAmount, double price);
+
+/*
+              DIGI-
+      _                _
+     /_\  ___ ___  ___| |_ ___
+    //_\\/ __/ __|/ _ \ __/ __|
+   /  _  \__ \__ \  __/ |_\__ \
+   \_/ \_/___/___/\___|\__|___/
+ */
+
+// First word must be zero, second must not be zero
+#define DA_IS_ISSUANCE(byte) ((~(byte) & 0xF0) && ((byte) & 0x0F))
+// First word must be 1
+#define DA_IS_TRANSFER(byte) ((byte) & 0x10)
+// First word must be 2
+#define DA_IS_BURN(byte)     ((byte) & 0x20)
+
+#define DA_TYPE_SHA1_META_SHA256      0x01
+#define DA_TYPE_SHA1_MS12_SHA256      0x02
+#define DA_TYPE_SHA1_MS13_SHA256      0x03
+#define DA_TYPE_SHA1_META             0x04
+#define DA_TYPE_SHA1_NO_META_LOCKED   0x05
+#define DA_TYPE_SHA1_NO_META_UNLOCKED 0x06
+
+#define DA_ASSET_DUST_AMOUNT 700
+
+typedef enum {
+    DA_UNDEFINED,
+    DA_ISSUANCE,
+    DA_TRANSFER,
+    DA_BURN
+} BRAssetOperation;
+
+typedef struct {
+    uint16_t info_hash[20];
+    uint16_t metadata[32];
+    
+    uint8_t version;
+    uint8_t has_metadata;
+    uint8_t has_infohash;
+    BRAssetOperation type;
+    uint8_t locked;
+} BRAssetData;
+
+BRUTXO * BRGetUTXO(BRWallet *wallet);
+
+BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo);
+
+uint8_t BRTXContainsAsset(BRTransaction *tx);
+
+uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount);
+
+uint8_t BROutpointIsAsset(const BRTxOutput* output);
+
+BRTransaction* BRGetTransactions(BRWallet *wallet);
+
+uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output);
 
 #ifdef __cplusplus
 }

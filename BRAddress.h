@@ -61,6 +61,7 @@ extern "C" {
 #define OP_EQUALVERIFY 0x88
 #define OP_HASH160     0xa9
 #define OP_CHECKSIG    0xac
+#define OP_RETURN      0x6a
 
 // reads a varint from buf and stores its length in intLen if intLen is non-NULL
 // returns the varint value
@@ -83,6 +84,9 @@ const uint8_t *BRScriptData(const uint8_t *elem, size_t *dataLen);
 // returns the number of bytes written, or scriptLen needed if script is NULL
 size_t BRScriptPushData(uint8_t *script, size_t scriptLen, const uint8_t *data, size_t dataLen);
 
+// returns a pointer to the 20byte pubkey hash, or NULL if none
+const uint8_t *BRScriptPKH(const uint8_t *script, size_t scriptLen);
+
 typedef struct {
     char s[36];
 } BRAddress;
@@ -96,6 +100,10 @@ size_t BRAddressFromScriptPubKey(char *addr, size_t addrLen, const uint8_t *scri
 // writes the bitcoin address for a scriptSig to addr
 // returns the number of bytes written, or addrLen needed if addr is NULL
 size_t BRAddressFromScriptSig(char *addr, size_t addrLen, const uint8_t *script, size_t scriptLen);
+
+// writes the bitcoin address for a witness to addr
+// returns the number of bytes written, or addrLen needed if addr is NULL
+size_t BRAddressFromWitness(char *addr, size_t addrLen, const uint8_t *witness, size_t witLen);
 
 // writes the scriptPubKey for addr to script
 // returns the number of bytes written, or scriptLen needed if script is NULL

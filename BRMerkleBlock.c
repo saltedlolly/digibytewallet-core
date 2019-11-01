@@ -139,25 +139,42 @@ BRMerkleBlock *BRMerkleBlockParse(const uint8_t *buf, size_t bufLen)
         BRSHA256_2(&block->blockHash, buf, 80);
 
         switch (block->version & BLOCK_VERSION_ALGO) {
-            case 512:
+            case BLOCK_VERSION_SHA256D:
+                // void BRSHA256_2(void *md32, const void *data, size_t len)
                 BRSHA256_2(&block->powHash, buf, 80);
                 break;
 
-            case 1536:
-                BRSkein(&block->powHash, buf);
+            case BLOCK_VERSION_SKEIN:
+                // void BRSkein(const char* input, char* output)
+                BRSkein((const char*) buf, (char*) &block->powHash.u8[0]);
                 break;
 
-            case 2048:
-                BRQubit(&block->powHash, buf);
+            case BLOCK_VERSION_QUBIT:
+                // void BRQubit(const char* input, char* output)
+                BRQubit((const char*) buf, (char*) &block->powHash.u8[0]);
                 break;
 
-            case 1024:
-                BRGroestl(&block->powHash, buf);
+            case BLOCK_VERSION_ODO:
+                // void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output)
+                BROdocrypt((const char*) buf, block->timestamp, &block->powHash.u8[0]);
+                break;
+                
+            case BLOCK_VERSION_GROESTL:
+                // void BRGroestl(const char* input, char* output)
+                BRGroestl((const char*) buf, (char*) &block->powHash.u8[0]);
                 break;
 
-            default:
+            case BLOCK_VERSION_SCRYPT:
+                // void BRScrypt(void *dk, size_t dkLen, const void *pw, size_t pwLen, const void *salt, size_t saltLen, unsigned n, unsigned r, unsigned p)
                 BRScrypt(&block->powHash, sizeof(block->powHash), buf, 80, buf, 80, 1024, 1, 1);
-
+                break;
+                
+            default:
+#if DEBUG
+                assert(0 && "Invalid algorithm");
+#else
+                break;
+#endif
         }
     }
     
@@ -330,7 +347,7 @@ int BRMerkleBlockIsValid(const BRMerkleBlock *block, uint32_t currentTime)
         if (block->powHash.u8[i] > t.u8[i]) {
             r = 0;
 
-            digi_log("invalid blockHash[%d]: %x - %x", i, block->powHash.u8[i], t.u8[i]);
+            digi_log("invalid blockHash[%d]: %x - %x, %s", i, block->powHash.u8[i], t.u8[i], log_u256_hex_encode(block->blockHash));
         }
     }
 
