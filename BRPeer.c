@@ -25,7 +25,6 @@
 #include "BRPeer.h"
 #include "BRMerkleBlock.h"
 #include "BRAddress.h"
-#include "BRDigiAsset.h"
 #include "BRSet.h"
 #include "BRArray.h"
 #include "BRCrypto.h"
@@ -86,9 +85,7 @@ typedef enum {
     inv_undefined = 0,
     inv_tx = 1,
     inv_block = 2,
-    inv_filtered_block = 3,
-    inv_cmpct_block = 4,
-    inv_dandelion = 5
+    inv_filtered_block = 3
 } inv_type;
 
 typedef struct {
@@ -103,14 +100,11 @@ typedef struct {
     uint32_t version, lastblock, earliestKeyTime, currentBlockHeight;
     double startTime, pingTime;
     volatile double disconnectTime, mempoolTime;
-    volatile int isSyncingAssets;
-    int sentVerack, gotVerack, sentGetaddr, sentFilter, sentGetdata, sentMempool, sentGetblocks, sentGetblocksReverse;
+    int sentVerack, gotVerack, sentGetaddr, sentFilter, sentGetdata, sentMempool, sentGetblocks;
     UInt256 lastBlockHash;
-    UInt256 lastAssetSyncBlockHash;
     BRMerkleBlock *currentBlock;
     UInt256 *currentBlockTxHashes, *knownBlockHashes, *knownTxHashes;
     BRSet *knownTxHashSet;
-    BRSet *knownAssetTxHashSet;
     volatile int socket;
     void *info;
     void (*connected)(void *info);
@@ -120,7 +114,6 @@ typedef struct {
     void (*hasTx)(void *info, UInt256 txHash);
     void (*rejectedTx)(void *info, UInt256 txHash, uint8_t code);
     void (*relayedBlock)(void *info, BRMerkleBlock *block);
-    void (*relayedAssetBlock)(void *info, BRMerkleBlock *block);
     void (*notfound)(void *info, const UInt256 txHashes[], size_t txCount, const UInt256 blockHashes[],
                      size_t blockCount);
     void (*setFeePerKb)(void *info, uint64_t feePerKb);
@@ -159,26 +152,6 @@ static void _BRPeerAddKnownTxHashes(const BRPeer *peer, const UInt256 txHashes[]
                 for (j = array_count(knownTxHashes); j > 0; j--) BRSetAdd(ctx->knownTxHashSet, &knownTxHashes[j - 1]);
             }
             else BRSetAdd(ctx->knownTxHashSet, &knownTxHashes[array_count(knownTxHashes) - 1]);
-        }
-    }
-}
-
-static void _BRPeerAddKnownAssetTxHashes(const BRPeer *peer, const UInt256 txHashes[], size_t txCount)
-{
-    BRPeerContext *ctx = (BRPeerContext *)peer;
-    UInt256 *knownTxHashes = ctx->knownAssetTxHashSet;
-    size_t i, j;
-    
-    for (i = 0; i < txCount; i++) {
-        if (! BRSetContains(ctx->knownTxHashSet, &txHashes[i])) {
-            array_add(knownTxHashes, txHashes[i]);
-            
-            if (ctx->knownAssetTxHashSet != knownTxHashes) { // check if knownTxHashes was moved to a new memory location
-                ctx->knownAssetTxHashSet = knownTxHashes;
-                BRSetClear(ctx->knownAssetTxHashSet);
-                for (j = array_count(knownTxHashes); j > 0; j--) BRSetAdd(ctx->knownAssetTxHashSet, &knownTxHashes[j - 1]);
-            }
-            else BRSetAdd(ctx->knownAssetTxHashSet, &knownTxHashes[array_count(knownTxHashes) - 1]);
         }
     }
 }
@@ -345,9 +318,6 @@ static int _BRPeerAcceptInvMessage(BRPeer *peer, const uint8_t *msg, size_t msgL
         size_t i, j, txCount = 0, blockCount = 0;
         
         peer_log(peer, "got inv with %zu item(s)", count);
-        if (count == 1) {
-            off += 0;
-        }
 
         for (i = 0; i < count; i++) {
             type = UInt32GetLE(&msg[off]);
@@ -355,8 +325,6 @@ static int _BRPeerAcceptInvMessage(BRPeer *peer, const uint8_t *msg, size_t msgL
             switch (type) { // inv messages only use inv_tx or inv_block
                 case inv_tx: transactions[txCount++] = &msg[off + sizeof(uint32_t)]; break;
                 case inv_block: blocks[blockCount++] = &msg[off + sizeof(uint32_t)]; break;
-                case inv_dandelion:
-                    transactions[txCount++] = &msg[off + sizeof(uint32_t)]; break;
                 default: break;
             }
 
@@ -382,51 +350,7 @@ static int _BRPeerAcceptInvMessage(BRPeer *peer, const uint8_t *msg, size_t msgL
             if (blockCount == 1) ctx->lastBlockHash = UInt256Get(blocks[0]);
 
             UInt256 hash, blockHashes[blockCount], txHashes[txCount];
-            if (ctx->isSyncingAssets && blockCount > 1) { // single inv is most likely recently mined block
-                // Select next block locator for reverse sync
-                ctx->lastAssetSyncBlockHash = UInt256Get(blocks[blockCount - 1]);
-                
-                if (blockCount > 2500) {
-                    // New mined block was somehow included into the response. Choose the block before
-                    // the newly mined block
-                    ctx->lastAssetSyncBlockHash = UInt256Get(blocks[blockCount - 2]);
-                }
-                
-                // Check if any transaction contains an asset issuance or transfer.
-                //
-                // For RELEVANT transfers we have to further track down the issuance
-                // (which means we have to update the bloom filter).
-                //
-                // For RELEVANT issuances we can resolve the wallet's assets,
-                // which could finally stop the reverse sync.
-       
-                UInt256 txHashes[txCount], blockHashes[blockCount];
-                UInt256 hash;
-                BRUTXO utxo;
-                
-                // Remember block hashes in case we need to rerequest them
-                for (i = 0; i < blockCount; i++) {
-                    blockHashes[i] = UInt256Get(blocks[i]);
-                    array_add(ctx->knownBlockHashes, blockHashes[i]);
-                }
-                
-                if (j > 0 || blockCount > 0)
-                    BRPeerSendGetdata(peer, txHashes, j, blockHashes, blockCount);
-                
-                // update bloom filter
-//                BRWalletUpdateAssetTxIds(<#BRWallet *wallet#>)
-            
-                if (blockCount >= 2500) {
-                    // send next getblock_reverse
-                    BRPeerSendGetblocksReverse(peer, &ctx->lastAssetSyncBlockHash, 1, EARLIEST_ASSET_BLOCKHASH);
-                } else {
-                    // DigiAssets sync finished.
-                    return r;
-                }
-                
-                return r;
-            }
-            
+
             for (i = 0; i < blockCount; i++) {
                 blockHashes[i] = UInt256Get(blocks[i]);
                 // remember blockHashes in case we need to re-request them with an updated bloom filter
@@ -451,8 +375,8 @@ static int _BRPeerAcceptInvMessage(BRPeer *peer, const uint8_t *msg, size_t msgL
             _BRPeerAddKnownTxHashes(peer, txHashes, j);
             if (j > 0 || blockCount > 0) BRPeerSendGetdata(peer, txHashes, j, blockHashes, blockCount);
     
-            // to improve chain download performance, if we received 2500 block hashes, request the next 2500 block hashes
-            if (blockCount >= 2500) {
+            // to improve chain download performance, if we received 500 block hashes, request the next 500 block hashes
+            if (blockCount >= 500) {
                 UInt256 locators[] = { blockHashes[blockCount - 1], blockHashes[0] };
             
                 BRPeerSendGetblocks(peer, locators, 2, UINT256_ZERO);
@@ -476,14 +400,6 @@ static int _BRPeerAcceptTxMessage(BRPeer *peer, const uint8_t *msg, size_t msgLe
     BRTransaction *tx = BRTransactionParse(msg, msgLen);
     UInt256 txHash;
     int r = 1;
-    
-    if (ctx->isSyncingAssets) {
-        peer_log(peer, "got tx during asset sync");
-        if (BRSetContains(ctx->knownAssetTxHashSet, tx)) {
-            // relayedAssetTx
-            BRSetRemove(ctx->knownAssetTxHashSet, tx);
-        }
-    }
 
     if (! tx) {
         peer_log(peer, "malformed tx message with length: %zu", msgLen);
@@ -497,7 +413,7 @@ static int _BRPeerAcceptTxMessage(BRPeer *peer, const uint8_t *msg, size_t msgLe
     else {
         txHash = tx->txHash;
         peer_log(peer, "got tx: %s", log_u256_hex_encode(txHash));
-        
+
         if (ctx->relayedTx) {
             ctx->relayedTx(ctx->info, tx);
         }
@@ -799,7 +715,7 @@ static int _BRPeerAcceptMerkleblockMessage(BRPeer *peer, const uint8_t *msg, siz
         
         assert(hashes != NULL);
         count = BRMerkleBlockTxHashes(block, hashes, count);
-            
+
         for (size_t i = count; i > 0; i--) { // reverse order for more efficient removal as tx arrive
             if (BRSetContains(ctx->knownTxHashSet, &hashes[i - 1])) continue;
             array_add(ctx->currentBlockTxHashes, hashes[i - 1]);
@@ -813,11 +729,7 @@ static int _BRPeerAcceptMerkleblockMessage(BRPeer *peer, const uint8_t *msg, siz
             ctx->currentBlock = block;
         }
         else if (ctx->relayedBlock) {
-            if (ctx->isSyncingAssets) {
-                ctx->relayedAssetBlock(ctx->info, block);
-            } else {
-                ctx->relayedBlock(ctx->info, block);
-            }
+            ctx->relayedBlock(ctx->info, block);
         }
         else BRMerkleBlockFree(block);
     }
@@ -1134,19 +1046,17 @@ static void _dummyThreadCleanup(void *info)
 }
 
 // returns a newly allocated BRPeer struct that must be freed by calling BRPeerFree()
-BRPeer *BRPeerNew(uint32_t magicNumber, int isSyncingAssets)
+BRPeer *BRPeerNew(uint32_t magicNumber)
 {
     BRPeerContext *ctx = calloc(1, sizeof(*ctx));
     
     assert(ctx != NULL);
     ctx->magicNumber = magicNumber;
-    ctx->isSyncingAssets = isSyncingAssets;
     array_new(ctx->useragent, 40);
     array_new(ctx->knownBlockHashes, 10);
     array_new(ctx->currentBlockTxHashes, 10);
     array_new(ctx->knownTxHashes, 10);
     ctx->knownTxHashSet = BRSetNew(BRTransactionHash, BRTransactionEq, 10);
-    ctx->knownAssetTxHashSet = BRSetNew(BRTransactionHash, BRTransactionEq, 10);
     array_new(ctx->pongInfo, 10);
     array_new(ctx->pongCallback, 10);
     ctx->pingTime = DBL_MAX;
@@ -1177,7 +1087,6 @@ void BRPeerSetCallbacks(BRPeer *peer, void *info,
                         void (*hasTx)(void *info, UInt256 txHash),
                         void (*rejectedTx)(void *info, UInt256 txHash, uint8_t code),
                         void (*relayedBlock)(void *info, BRMerkleBlock *block),
-                        void (*relayedAssetBlock)(void* info, BRMerkleBlock* block),
                         void (*notfound)(void *info, const UInt256 txHashes[], size_t txCount,
                                          const UInt256 blockHashes[], size_t blockCount),
                         void (*setFeePerKb)(void *info, uint64_t feePerKb),
@@ -1195,19 +1104,11 @@ void BRPeerSetCallbacks(BRPeer *peer, void *info,
     ctx->hasTx = hasTx;
     ctx->rejectedTx = rejectedTx;
     ctx->relayedBlock = relayedBlock;
-    ctx->relayedAssetBlock = relayedAssetBlock;
     ctx->notfound = notfound;
     ctx->setFeePerKb = setFeePerKb;
     ctx->requestedTx = requestedTx;
     ctx->networkIsReachable = networkIsReachable;
     ctx->threadCleanup = (threadCleanup) ? threadCleanup : _dummyThreadCleanup;
-}
-
-void BRPeerEnterAssetSyncState(BRPeer* peer, int isAssetSync)
-{
-    peer_log(peer, "has entered assetSyncStage");
-    BRPeerContext* ctx = ((BRPeerContext*) peer);
-    ctx->isSyncingAssets = isAssetSync;
 }
 
 // set earliestKeyTime to wallet creation time in order to speed up initial sync
@@ -1527,33 +1428,6 @@ void BRPeerSendGetblocks(BRPeer *peer, const UInt256 locators[], size_t locators
     }
 }
 
-void BRPeerSendGetblocksReverse(BRPeer *peer, const UInt256 locators[], size_t locatorsCount, UInt256 hashStop)
-{
-    size_t i, off = 0;
-    size_t msgLen = sizeof(uint32_t) + BRVarIntSize(locatorsCount) + sizeof(*locators)*locatorsCount + sizeof(hashStop);
-    uint8_t msg[msgLen];
-    
-    UInt32SetLE(&msg[off], PROTOCOL_VERSION);
-    off += sizeof(uint32_t);
-    off += BRVarIntSet(&msg[off], (off <= msgLen ? msgLen - off : 0), locatorsCount);
-    
-    for (i = 0; i < locatorsCount; i++) {
-        UInt256Set(&msg[off], locators[i]);
-        off += sizeof(UInt256);
-    }
-    
-    UInt256Set(&msg[off], hashStop);
-    off += sizeof(UInt256);
-    
-    if (locatorsCount > 0) {
-        peer_log(peer, "calling getblocks_reverse with %zu locators: [%s, %s %s]", locatorsCount,
-                 log_u256_hex_encode(locators[0]), (locatorsCount > 2 ? " ...," : ""),
-                 (locatorsCount > 1 ? log_u256_hex_encode(locators[locatorsCount - 1]) : ""));
-        BRPeerSendMessage(peer, msg, off, MSG_GETBLOCKS_R);
-    }
-}
-
-
 void BRPeerSendInv(BRPeer *peer, const UInt256 txHashes[], size_t txCount)
 {
     BRPeerContext *ctx = (BRPeerContext *)peer;
@@ -1654,6 +1528,7 @@ void BRPeerFree(BRPeer *peer)
     if (ctx->useragent) array_free(ctx->useragent);
     if (ctx->currentBlockTxHashes) array_free(ctx->currentBlockTxHashes);
     if (ctx->knownBlockHashes) array_free(ctx->knownBlockHashes);
+    if (ctx->knownTxHashes) array_free(ctx->knownTxHashes);
     if (ctx->knownTxHashSet) BRSetFree(ctx->knownTxHashSet);
     if (ctx->pongInfo) array_free(ctx->pongInfo);
     if (ctx->pongCallback) array_free(ctx->pongCallback);

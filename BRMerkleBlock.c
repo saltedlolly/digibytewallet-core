@@ -31,8 +31,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include <sys/time.h>
-
 #define MAX_PROOF_OF_WORK 0x1e0fffff    // highest value for difficulty target (higher values are less difficult)
 #define TARGET_TIMESPAN (0.10*24*60*60) // the targeted timespan between difficulty target adjustments
 #define BLOCK_VERSION_ALGO (7 << 9)
@@ -139,29 +137,35 @@ BRMerkleBlock *BRMerkleBlockParse(const uint8_t *buf, size_t bufLen)
         }
         
         BRSHA256_2(&block->blockHash, buf, 80);
-        
+
         switch (block->version & BLOCK_VERSION_ALGO) {
             case BLOCK_VERSION_SHA256D:
+                // void BRSHA256_2(void *md32, const void *data, size_t len)
                 BRSHA256_2(&block->powHash, buf, 80);
                 break;
 
             case BLOCK_VERSION_SKEIN:
+                // void BRSkein(const char* input, char* output)
                 BRSkein((const char*) buf, (char*) &block->powHash.u8[0]);
                 break;
 
             case BLOCK_VERSION_QUBIT:
+                // void BRQubit(const char* input, char* output)
                 BRQubit((const char*) buf, (char*) &block->powHash.u8[0]);
                 break;
 
             case BLOCK_VERSION_ODO:
+                // void BROdocrypt(const char* input, const uint32_t nTime, uint8_t* output)
                 BROdocrypt((const char*) buf, block->timestamp, &block->powHash.u8[0]);
                 break;
                 
             case BLOCK_VERSION_GROESTL:
+                // void BRGroestl(const char* input, char* output)
                 BRGroestl((const char*) buf, (char*) &block->powHash.u8[0]);
                 break;
 
             case BLOCK_VERSION_SCRYPT:
+                // void BRScrypt(void *dk, size_t dkLen, const void *pw, size_t pwLen, const void *salt, size_t saltLen, unsigned n, unsigned r, unsigned p)
                 BRScrypt(&block->powHash, sizeof(block->powHash), buf, 80, buf, 80, 1024, 1, 1);
                 break;
                 

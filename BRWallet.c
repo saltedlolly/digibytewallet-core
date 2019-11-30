@@ -40,7 +40,6 @@ struct BRWalletStruct {
     uint32_t blockHeight;
     BRUTXO *utxos;
     BRTransaction **transactions;
-    BRSet* assetTxIds;
     BRMasterPubKey masterPubKey;
     BRAddress *internalChain, *externalChain;
     BRAddress *internalChainSegwit, *externalChainSegwit;
@@ -293,7 +292,6 @@ BRWallet *BRWalletNew(BRTransaction *transactions[], size_t txCount, BRMasterPub
     wallet->spentOutputs = BRSetNew(BRUTXOHash, BRUTXOEq, txCount + 100);
     wallet->usedAddrs = BRSetNew(BRAddressHash, BRAddressEq, txCount + 100);
     wallet->allAddrs = BRSetNew(BRAddressHash, BRAddressEq, txCount + 100);
-    wallet->assetTxIds = BRSetNew(BRUTXOHash, BRUTXOEq, 100);
     pthread_mutex_init(&wallet->lock, NULL);
 
     for (size_t i = 0; transactions && i < txCount; i++) {
@@ -513,33 +511,6 @@ size_t BRWalletTxUnconfirmedBefore(BRWallet *wallet, BRTransaction *transactions
     return txCount;
 }
 
-int BRWalletAssetIsRelevantAssetTx(BRWallet* wallet, BRUTXO* txID) {
-    assert(wallet != NULL);
-    return BRSetContains(wallet->assetTxIds, txID);
-}
-
-void BRWalletUpdateAssetTxIds(BRWallet* wallet) {
-    assert(wallet != NULL);
-    
-    for (size_t i = 0; i < array_count(wallet->transactions); ++i) {
-        if (BRContainsAsset(wallet->transactions[i]->outputs, wallet->transactions[i]->outCount)) {
-            BRAssetGetInputTxIds(wallet, wallet->transactions[i], wallet->assetTxIds);
-        }
-    }
-}
-
-size_t BRWalletRelevantAssetTxIds(BRWallet* wallet, BRUTXO* txIDs[], size_t txCount)
-{
-    assert(wallet != NULL);
-    
-    size_t total = BRSetCount(wallet->assetTxIds);
-    if (txIDs == NULL) return total;
-    
-    BRSetAll(wallet->assetTxIds, &txIDs[0], txCount);
-    
-    return txCount;
-}
-
 // total amount spent from the wallet (exluding change)
 uint64_t BRWalletTotalSent(BRWallet *wallet)
 {
@@ -601,20 +572,15 @@ size_t BRWalletAllAddrs(BRWallet *wallet, BRAddress addrs[], size_t addrsCount)
     size_t internalCountSegwit, externalCountSegwit = 0;
     size_t rest = (addrsCount == 0 ? 100000 : addrsCount);
     
-    size_t divider = 4;
-    size_t addressesPerType = rest / divider;
-    
     assert(wallet != NULL);
     pthread_mutex_lock(&wallet->lock);
     
     internalCountSegwit = (! addrs || array_count(wallet->internalChainSegwit) < rest) ?
         array_count(wallet->internalChainSegwit) : rest;
-    if (internalCountSegwit > addressesPerType) internalCountSegwit = addressesPerType;
     rest -= internalCountSegwit;
     
     internalCount = (! addrs || array_count(wallet->internalChain) < rest) ?
         array_count(wallet->internalChain) : rest;
-    if (internalCount > addressesPerType) internalCount = addressesPerType;
     rest -= internalCount;
 
     // Add the segwit addresses first
@@ -628,12 +594,10 @@ size_t BRWalletAllAddrs(BRWallet *wallet, BRAddress addrs[], size_t addrsCount)
 
     externalCountSegwit = (! addrs || array_count(wallet->externalChainSegwit) < rest) ?
         array_count(wallet->externalChainSegwit) : rest;
-    if (externalCountSegwit > addressesPerType) externalCountSegwit = addressesPerType;
     rest -= externalCountSegwit;
     
     externalCount = (! addrs || array_count(wallet->externalChain) < rest) ?
                     array_count(wallet->externalChain) : rest;
-    if (externalCount > addressesPerType) externalCount = addressesPerType;
     rest -= externalCount;
 
     // Add the external segwit addresses first
@@ -1434,23 +1398,4 @@ uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output)
     if (BROutpointIsAsset(&output) > 0) return 0;
     if (BRSetContains(wallet->spentOutputs, &output)) return 0;
     return 1;
-}
-
-// If at least one transaction is an asset, we need to resync.
-uint8_t BRWalletNeedsReverseSync(BRWallet* wallet)
-{
-    size_t count = BRSetCount(wallet->allTx);
-    if (count == 0) return 0;
-    
-    BRTransaction* allTx[count];
-    BRWalletTransactions(wallet, allTx, count);
-    
-    for (size_t i = 0; i < count; ++i) {
-        if (allTx[i]->assetCount) {
-            if (allTx[i]->digiassets == NULL || !allTx[i]->digiassets->has_infohash)
-                return 1;
-        }
-    }
-    
-    return 0;
 }

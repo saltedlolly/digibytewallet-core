@@ -101,8 +101,8 @@ typedef struct {
     uint32_t blockHeight;
     uint32_t timestamp; // time interval since unix epoch
     uint8_t is_dandelion;
-    BRAssetData* digiassets;
-    size_t assetCount;
+//    BRAssetData* digiassets;
+//    size_t assetCount;
 } BRTransaction;
 
 // returns a newly allocated empty transaction that must be freed by calling BRTransactionFree()
