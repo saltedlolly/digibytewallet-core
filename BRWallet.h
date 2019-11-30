@@ -77,8 +77,6 @@ typedef struct {
     UInt256 hash;
     uint32_t n;
 } BRUTXO;
-    
-
 
 inline static size_t BRUTXOHash(const void *utxo)
 {
@@ -248,6 +246,21 @@ BRTransaction* BRGetTransactions(BRWallet *wallet);
 BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo);
 
 uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output);
+
+// Determines if the wallet needs an additional reverse sync
+// in order to trace asset origins (issuance txs).
+// These issuance transactions contain the essential infohashes +
+// optional security-related metadata sha256 hashes
+uint8_t BRWalletNeedsReverseSync(BRWallet* wallet);
+
+// Returns relevant txIds for assets (missing input transactions)
+size_t BRWalletRelevantAssetTxIds(BRWallet* wallet, BRUTXO* txIDs[], size_t txCount);
+
+// Returns whether txID is asset relevant
+int BRWalletAssetIsRelevantAssetTx(BRWallet* wallet, BRUTXO* txID);
+
+// Updates required txIds for assets according to the asset transactions
+void BRWalletUpdateAssetTxIds(BRWallet* wallet);
 
 #ifdef __cplusplus
 }

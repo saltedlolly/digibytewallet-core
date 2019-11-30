@@ -26,6 +26,7 @@
 #include "BRKey.h"
 #include "BRAddress.h"
 #include "BRArray.h"
+#include "BRDigiAsset.h"
 #include <stdlib.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -421,6 +422,7 @@ BRTransaction *BRTransactionParse(const uint8_t *buf, size_t bufLen)
     int isSigned = 1, witnessFlag = 0;
     uint8_t *sBuf;
     size_t i, j, off = 0, witnessOff = 0, sLen = 0, len = 0, count;
+    int hasAssets = 0;
     BRTransaction *tx = BRTransactionNew();
     BRTxInput *input;
     BRTxOutput *output;
@@ -472,6 +474,8 @@ BRTransaction *BRTransactionParse(const uint8_t *buf, size_t bufLen)
         off += len;
         if (off + sLen <= bufLen) BRTxOutputSetScript(output, &buf[off], sLen);
         off += sLen;
+        
+        if (BROutpointIsAsset(output)) hasAssets = 1;
     }
     
     for (i = 0, witnessOff = off; witnessFlag && off <= bufLen && i < tx->inCount; i++) {
@@ -507,6 +511,17 @@ BRTransaction *BRTransactionParse(const uint8_t *buf, size_t bufLen)
     else if (isSigned) {
         BRSHA256_2(&tx->txHash, buf, off);
         tx->wtxHash = tx->txHash;
+    }
+    
+    if (hasAssets) {
+        tx->assetCount = 1;
+        tx->digiassets = BRAssetDataNew(tx->assetCount);
+        if (tx->digiassets != NULL) {
+            if (!BRDecodeAssets(tx)) {
+                tx->assetCount = 0;
+                BRAssetDataFree(tx->digiassets);
+            }
+        }
     }
     
     return tx;

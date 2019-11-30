@@ -86,6 +86,7 @@ extern "C" {
 #define MSG_GETDATA      "getdata"
 #define MSG_NOTFOUND     "notfound"
 #define MSG_GETBLOCKS    "getblocks"
+#define MSG_GETBLOCKS_R  "getblocks_r" // DigiAssets sync
 #define MSG_GETHEADERS   "getheaders"
 #define MSG_TX           "tx"
 #define MSG_DANDELION_TX "dandeliontx"
@@ -128,7 +129,7 @@ typedef struct {
 // NOTE: BRPeer functions are not thread-safe
 
 // returns a newly allocated BRPeer struct that must be freed by calling BRPeerFree()
-BRPeer *BRPeerNew(uint32_t magicNumber);
+BRPeer *BRPeerNew(uint32_t magicNumber, int isSyncingAssets);
 
 // info is a void pointer that will be passed along with each callback call
 // void connected(void *) - called when peer handshake completes successfully
@@ -150,12 +151,15 @@ void BRPeerSetCallbacks(BRPeer *peer, void *info,
                         void (*hasTx)(void *info, UInt256 txHash),
                         void (*rejectedTx)(void *info, UInt256 txHash, uint8_t code),
                         void (*relayedBlock)(void *info, BRMerkleBlock *block),
+                        void (*relayedAssetBlock)(void *info, BRMerkleBlock *block),
                         void (*notfound)(void *info, const UInt256 txHashes[], size_t txCount,
                                          const UInt256 blockHashes[], size_t blockCount),
                         void (*setFeePerKb)(void *info, uint64_t feePerKb),
                         BRTransaction *(*requestedTx)(void *info, UInt256 txHash),
                         int (*networkIsReachable)(void *info),
                         void (*threadCleanup)(void *info));
+
+void BRPeerEnterAssetSyncState(BRPeer* peer, int isAssetSync);
 
 // set earliestKeyTime to wallet creation time in order to speed up initial sync
 void BRPeerSetEarliestKeyTime(BRPeer *peer, uint32_t earliestKeyTime);
@@ -203,6 +207,7 @@ void BRPeerSendMempool(BRPeer *peer, const UInt256 knownTxHashes[], size_t known
                        void (*completionCallback)(void *info, int success));
 void BRPeerSendGetheaders(BRPeer *peer, const UInt256 locators[], size_t locatorsCount, UInt256 hashStop);
 void BRPeerSendGetblocks(BRPeer *peer, const UInt256 locators[], size_t locatorsCount, UInt256 hashStop);
+void BRPeerSendGetblocksReverse(BRPeer *peer, const UInt256 locators[], size_t locatorsCount, UInt256 hashStop);
 void BRPeerSendInv(BRPeer *peer, const UInt256 txHashes[], size_t txCount);
 void BRPeerSendGetdata(BRPeer *peer, const UInt256 txHashes[], size_t txCount, const UInt256 blockHashes[],
                        size_t blockCount);

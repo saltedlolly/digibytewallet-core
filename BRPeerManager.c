@@ -25,6 +25,7 @@
 #include "BRPeerManager.h"
 #include "BRBloomFilter.h"
 #include "BRSet.h"
+#include "BRDigiAsset.h"
 #include "BRArray.h"
 #include "BRInt.h"
 #include <stdlib.h>
@@ -188,8 +189,10 @@ struct BRPeerManagerStruct {
     BRTxPeerList *txRelays, *txRequests;
     BRPublishedTx *publishedTx;
     UInt256 *publishedTxHashes;
+    uint8_t isSyncingAssets;
     void *info;
     void (*syncStarted)(void *info);
+    void (*assetSyncStarted)(void *info);
     void (*syncStopped)(void *info, int error);
     void (*txStatusUpdate)(void *info);
     void (*saveBlocks)(void *info, int replace, BRMerkleBlock *blocks[], size_t blocksCount, uint64_t* stackIntegrityCheck);
@@ -286,6 +289,79 @@ static size_t _BRPeerManagerAddPeer(BRPeerManager *manager, BRPeer *peer) {
 	return add;
 }
 
+uint8_t* datahex(char* string) {
+
+    if(string == NULL)
+       return NULL;
+
+    size_t slength = strlen(string);
+    if((slength % 2) != 0) // must be even
+       return NULL;
+
+    size_t dlength = slength / 2;
+
+    uint8_t* data = malloc(dlength);
+    memset(data, 0, dlength);
+
+    size_t index = 0;
+    while (index < slength) {
+        char c = string[index];
+        int value = 0;
+        if(c >= '0' && c <= '9')
+          value = (c - '0');
+        else if (c >= 'A' && c <= 'F')
+          value = (10 + (c - 'A'));
+        else if (c >= 'a' && c <= 'f')
+          value = (10 + (c - 'a'));
+        else {
+          free(data);
+          return NULL;
+        }
+
+        data[(index/2)] += value << (((index + 1) % 2) * 4);
+
+        index++;
+    }
+
+    return data;
+}
+
+static void _BRPeerManagerLoadAssetBloomFilter(BRPeerManager* manager, BRPeer* peer)
+{
+    size_t txCount = BRWalletRelevantAssetTxIds(manager->wallet, NULL, 0);
+    BRUTXO** txIds = malloc(txCount * sizeof(BRUTXO*));
+    BRWalletRelevantAssetTxIds(manager->wallet, txIds, txCount);
+    
+    BRBloomFilter *filter;
+    filter = BRBloomFilterNew(manager->fpRate, txCount + 100, (uint32_t) BRPeerHash(peer),
+                              BLOOM_UPDATE_ALL);
+    
+    for (size_t i = 0; i < txCount; ++i) {
+        //        UInt256 txHash = uint256("b9bc822e8750bf792e782782878b4be535fe7bad76b2daecaa6b686bdcd61f5b");
+        //        txHash = UInt256Reverse(txHash);
+        BRUTXO* txHash = txIds[i];
+        UInt256 revHash = UInt256Reverse(txHash->hash);
+        if (!BRBloomFilterContainsData(filter, txHash->hash.u8, sizeof(UInt256))) {
+            peer_log(peer, "asset utxo of interest: %s (%d)", u256hex(txHash->hash), txHash->n);
+            BRBloomFilterInsertData(filter, txHash->hash.u8, sizeof(UInt256));
+        }
+        
+//        if (!BRBloomFilterContainsData(filter, revHash.u8, sizeof(UInt256))) {
+//            BRBloomFilterInsertData(filter, revHash.u8, sizeof(UInt256));
+//        }
+    }
+            
+    free(txIds);
+    
+    if (manager->bloomFilter) BRBloomFilterFree(manager->bloomFilter);
+    manager->bloomFilter = filter;
+
+    uint8_t data[BRBloomFilterSerialize(filter, NULL, 0)];
+    size_t len = BRBloomFilterSerialize(filter, data, sizeof(data));
+    
+    BRPeerSendFilterload(peer, data, len);
+}
+
 static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
 {
     // every time a new wallet address is added, the bloom filter has to be rebuilt, and each address is only used
@@ -337,7 +413,8 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
         
         UInt256Set(o, utxos[i].hash);
         UInt32SetLE(&o[sizeof(UInt256)], utxos[i].n);
-        if (! BRBloomFilterContainsData(filter, o, sizeof(o))) BRBloomFilterInsertData(filter, o, sizeof(o));
+        if (! BRBloomFilterContainsData(filter, o, sizeof(o)))
+            BRBloomFilterInsertData(filter, o, sizeof(o));
     }
     
     free(utxos);
@@ -352,7 +429,8 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
                 BRWalletContainsAddress(manager->wallet, tx->outputs[input->index].address)) {
                 UInt256Set(o, input->txHash);
                 UInt32SetLE(&o[sizeof(UInt256)], input->index);
-                if (! BRBloomFilterContainsData(filter, o, sizeof(o))) BRBloomFilterInsertData(filter, o,sizeof(o));
+                if (! BRBloomFilterContainsData(filter, o, sizeof(o)))
+                    BRBloomFilterInsertData(filter, o,sizeof(o));
             }
         }
     }
@@ -469,6 +547,30 @@ static void _BRPeerManagerUpdateFilter(BRPeerManager *manager)
         // wait for pong so we're sure to include any tx already sent by the peer in the updated filter
         BRPeerSendPing(manager->downloadPeer, info, _updateFilterPingDone);
     }
+}
+
+static void _BRPeerManagerEnterAssetsStage(BRPeerManager* manager, BRPeer* peer) {
+    assert(manager != NULL);
+    manager->isSyncingAssets = 1;
+    
+    peer_log(peer, "regular sync finished, starting assetSync");
+    
+    for (size_t i = 0; i < array_count(manager->peers); ++i) {
+        BRPeerEnterAssetSyncState(&manager->peers[i], 1);
+    }
+    
+    BRWalletUpdateAssetTxIds(manager->wallet);
+    _BRPeerManagerLoadAssetBloomFilter(manager, peer);
+
+    UInt256 locators[_BRPeerManagerBlockLocators(manager, NULL, 0)];
+    size_t locatorsCount = _BRPeerManagerBlockLocators(manager, locators,
+                                                       sizeof(locators)/sizeof(*locators));
+    
+    peer_log(peer, "calling getblocks_reverse");
+    
+    // It's sufficient to pass one single block locator hash, as we don't need branch
+    // detection. We simply want to walk backwards.
+    BRPeerSendGetblocksReverse(peer, &manager->lastBlock->blockHash, 1, EARLIEST_ASSET_BLOCKHASH);
 }
 
 static void _BRPeerManagerUpdateTx(BRPeerManager *manager, const UInt256 txHashes[], size_t txCount,
@@ -838,7 +940,11 @@ static void _peerConnected(void *info)
         }
         else { // we're already synced
             manager->connectFailureCount = 0; // reset connect failure count
-            _BRPeerManagerLoadMempools(manager);
+            if (BRWalletNeedsReverseSync(manager->wallet)) {
+                _BRPeerManagerEnterAssetsStage(manager, peer);
+            } else {
+                _BRPeerManagerLoadMempools(manager);
+            }
         }
     }
 
@@ -1229,6 +1335,34 @@ static int _BRPeerManagerVerifyBlock(BRPeerManager *manager, BRMerkleBlock *bloc
     return r;
 }
 
+static void _peerRelayedBlockDuringAssetSync(void* info, BRMerkleBlock* block)
+{
+    BRPeer *peer = ((BRPeerCallbackInfo *)info)->peer;
+    BRPeerManager *manager = ((BRPeerCallbackInfo *)info)->manager;
+    size_t txCount = BRMerkleBlockTxHashes(block, NULL, 0);
+    UInt256 _txHashes[(sizeof(UInt256)*txCount <= 0x1000) ? txCount : 0],
+            *txHashes = (sizeof(UInt256)*txCount <= 0x1000) ? _txHashes : malloc(txCount*sizeof(*txHashes));
+    size_t i, fpCount = 0, saveCount = 0;
+    BRMerkleBlock orphan, *b, *b2, *prev, *next = NULL;
+    uint32_t txTime = 0;
+    
+    assert(txHashes != NULL);
+    txCount = BRMerkleBlockTxHashes(block, txHashes, txCount);
+    
+    if (txCount > 0)
+        peer_log(peer, "Hi there");
+    
+    // If we are currently syncing assets,
+    // we need to check if merkleBlock txs contain one of the assets txs
+    if (manager->isSyncingAssets) {
+        for (i = 0; i < txCount; i++) {
+            if (BRWalletAssetIsRelevantAssetTx(manager->wallet, (BRUTXO*) &txHashes[i])) {
+                peer_log(peer, "Here we are");
+            }
+        }
+    }
+}
+
 static void _peerRelayedBlock(void *info, BRMerkleBlock *block)
 {
     BRPeer *peer = ((BRPeerCallbackInfo *)info)->peer;
@@ -1282,7 +1416,7 @@ static void _peerRelayedBlock(void *info, BRMerkleBlock *block)
         BRMerkleBlockFree(block);
         block = NULL;
     }
-    else if (manager->bloomFilter == NULL) { // ingore potentially incomplete blocks when a filter update is pending
+    else if (manager->bloomFilter == NULL) { // ignore potentially incomplete blocks when a filter update is pending
         BRMerkleBlockFree(block);
         block = NULL;
 
@@ -1346,7 +1480,11 @@ static void _peerRelayedBlock(void *info, BRMerkleBlock *block)
         
         if (block->height == manager->estimatedHeight) { // chain download is complete
             saveCount = SAVE_BLOCK_COUNT;
-            _BRPeerManagerLoadMempools(manager);
+            if (BRWalletNeedsReverseSync(manager->wallet)) {
+                _BRPeerManagerEnterAssetsStage(manager, peer);
+            } else {
+                _BRPeerManagerLoadMempools(manager);
+            }
         }
     }
     else if (BRSetContains(manager->blocks, block)) { // we already have the block (or at least the header)
@@ -1426,7 +1564,12 @@ static void _peerRelayedBlock(void *info, BRMerkleBlock *block)
             
             if (block->height == manager->estimatedHeight) { // chain download is complete
                 saveCount = SAVE_BLOCK_COUNT;
-                _BRPeerManagerLoadMempools(manager);
+                
+                if (BRWalletNeedsReverseSync(manager->wallet)) {
+                    _BRPeerManagerEnterAssetsStage(manager, peer);
+                } else {
+                    _BRPeerManagerLoadMempools(manager);
+                }
             }
         }
     }
@@ -1450,8 +1593,6 @@ static void _peerRelayedBlock(void *info, BRMerkleBlock *block)
             b = BRSetGet(manager->blocks, &b->prevBlock);
         }
     }
-    
-
     
     /* save the blocks */
     pthread_mutex_unlock(&manager->lock);
@@ -1725,6 +1866,8 @@ void BRPeerManagerSetCallbacks(BRPeerManager *manager, void *info,
     manager->savePeers = savePeers;
     manager->networkIsReachable = networkIsReachable;
     manager->threadCleanup = (threadCleanup) ? threadCleanup : _dummyThreadCleanup;
+    
+    manager->isSyncingAssets = 0;
 }
 
 // specifies a single fixed peer to use when connecting to the bitcoin network
@@ -1808,12 +1951,12 @@ void BRPeerManagerConnect(BRPeerManager *manager)
                 info = calloc(1, sizeof(*info));
                 assert(info != NULL);
                 info->manager = manager;
-                info->peer = BRPeerNew(manager->params->magicNumber);
+                info->peer = BRPeerNew(manager->params->magicNumber, manager->isSyncingAssets);
                 *info->peer = peers[i];
                 array_rm(peers, i);
                 array_add(manager->connectedPeers, info->peer);
                 BRPeerSetCallbacks(info->peer, info, _peerConnected, _peerDisconnected, _peerRelayedPeers,
-                                   _peerRelayedTx, _peerHasTx, _peerRejectedTx, _peerRelayedBlock, _peerDataNotfound,
+                                   _peerRelayedTx, _peerHasTx, _peerRejectedTx, _peerRelayedBlock, _peerRelayedBlockDuringAssetSync, _peerDataNotfound,
                                    _peerSetFeePerKb, _peerRequestedTx, _peerNetworkIsReachable, _peerThreadCleanup);
                 BRPeerSetEarliestKeyTime(info->peer, manager->earliestKeyTime);
                 BRPeerConnect(info->peer);

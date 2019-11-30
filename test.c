@@ -2675,7 +2675,7 @@ void BRPeerAcceptMessageTest(BRPeer *peer, const uint8_t *msg, size_t len, const
 int BRPeerTests()
 {
     int r = 1;
-    BRPeer *p = BRPeerNew(BR_CHAIN_PARAMS.magicNumber);
+    BRPeer *p = BRPeerNew(BR_CHAIN_PARAMS.magicNumber, 0);
     const char msg[] = "my message";
     
     BRPeerAcceptMessageTest(p, (const uint8_t *)msg, sizeof(msg) - 1, "inv");
