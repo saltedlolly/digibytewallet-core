@@ -122,6 +122,9 @@ size_t BRWalletUnusedAddrs(BRWallet *wallet, BRAddress addrs[], uint32_t gapLimi
 
 // returns the first unused external address
 BRAddress BRWalletReceiveAddress(BRWallet *wallet, int useSegwit);
+
+// returns the first unused internal address
+BRAddress BRWalletInternalChangeAddress(BRWallet *wallet);
     
 // writes all addresses previously genereated with BRWalletUnusedAddrs() to addrs
 // returns the number addresses written, or total number available if addrs is NULL
@@ -242,6 +245,8 @@ int64_t BRLocalAmount(int64_t amount, double price);
 int64_t BRBitcoinAmount(int64_t localAmount, double price);
 
 BRUTXO * BRGetUTXO(BRWallet *wallet);
+
+int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index);
 
 BRTransaction* BRGetTransactions(BRWallet *wallet);
 

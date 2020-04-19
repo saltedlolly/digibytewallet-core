@@ -176,7 +176,7 @@ inline static int _BRBlockHeightEq(const void *block, const void *otherBlock)
 struct BRPeerManagerStruct {
     const BRChainParams *params;
     BRWallet *wallet;
-    int isConnected, connectFailureCount, misbehavinCount, dnsThreadCount, maxConnectCount;
+    int isConnected, connectFailureCount, misbehavinCount, dnsThreadCount, maxConnectCount, peerThreadCount;
     BRPeer *peers, *downloadPeer, fixedPeer, **connectedPeers;
     char downloadPeerName[INET6_ADDRSTRLEN + 6];
     uint32_t earliestKeyTime, syncStartHeight, filterUpdateHeight, estimatedHeight;
@@ -1591,6 +1591,10 @@ static void _peerThreadCleanup(void *info)
 {
     BRPeerManager *manager = ((BRPeerCallbackInfo *)info)->manager;
 
+    pthread_mutex_lock(&manager->lock);
+    manager->peerThreadCount--;
+    pthread_mutex_unlock(&manager->lock);
+    
     free(info);
     if (manager->threadCleanup) manager->threadCleanup(manager->info);
 }
@@ -1812,11 +1816,19 @@ void BRPeerManagerConnect(BRPeerManager *manager)
                 *info->peer = peers[i];
                 array_rm(peers, i);
                 array_add(manager->connectedPeers, info->peer);
+                manager->peerThreadCount++;
                 BRPeerSetCallbacks(info->peer, info, _peerConnected, _peerDisconnected, _peerRelayedPeers,
                                    _peerRelayedTx, _peerHasTx, _peerRejectedTx, _peerRelayedBlock, _peerDataNotfound,
                                    _peerSetFeePerKb, _peerRequestedTx, _peerNetworkIsReachable, _peerThreadCleanup);
                 BRPeerSetEarliestKeyTime(info->peer, manager->earliestKeyTime);
                 BRPeerConnect(info->peer);
+                
+                if (BRPeerConnectStatus(info->peer) == BRPeerStatusDisconnected) {
+                    pthread_mutex_unlock(&manager->lock);
+                    _peerDisconnected(info, ENOTCONN);
+                    pthread_mutex_lock(&manager->lock);
+                    manager->peerThreadCount--;
+                }
             }
         }
 
@@ -1835,29 +1847,40 @@ void BRPeerManagerConnect(BRPeerManager *manager)
 void BRPeerManagerDisconnect(BRPeerManager *manager)
 {
     struct timespec ts;
-    size_t peerCount, dnsThreadCount;
+    size_t peerThreadCount, dnsThreadCount, maxConnectCount;
+    BRPeer *p;
     
     assert(manager != NULL);
     pthread_mutex_lock(&manager->lock);
-    peerCount = array_count(manager->connectedPeers);
-    dnsThreadCount = manager->dnsThreadCount;
     
-    for (size_t i = peerCount; i > 0; i--) {
+    // prevent new peers from being spawned
+    maxConnectCount = manager->maxConnectCount;
+    manager->maxConnectCount = 0;
+    
+    for (size_t i = array_count(manager->connectedPeers); i > 0; i--) {
+        p = manager->connectedPeers[i - 1];
         manager->connectFailureCount = MAX_CONNECT_FAILURES; // prevent futher automatic reconnect attempts
-        BRPeerDisconnect(manager->connectedPeers[i - 1]);
+        BRPeerDisconnect(p);
+        if (BRPeerConnectStatus(p) == BRPeerStatusConnecting) manager->peerThreadCount--; // waiting for network
     }
     
+    peerThreadCount = manager->peerThreadCount;
+    dnsThreadCount = manager->dnsThreadCount;
     pthread_mutex_unlock(&manager->lock);
     ts.tv_sec = 0;
     ts.tv_nsec = 1;
     
-    while (peerCount > 0 || dnsThreadCount > 0) {
+    while (peerThreadCount > 0 || dnsThreadCount > 0) {
         nanosleep(&ts, NULL); // pthread_yield() isn't POSIX standard :(
         pthread_mutex_lock(&manager->lock);
-        peerCount = array_count(manager->connectedPeers);
+        peerThreadCount = manager->peerThreadCount;
         dnsThreadCount = manager->dnsThreadCount;
         pthread_mutex_unlock(&manager->lock);
     }
+    
+    pthread_mutex_lock(&manager->lock);
+    manager->maxConnectCount = maxConnectCount;
+    pthread_mutex_unlock(&manager->lock);
 }
 
 // rescans blocks and transactions after earliestKeyTime (a new random download peer is also selected due to the
