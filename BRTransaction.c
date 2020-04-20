@@ -167,6 +167,11 @@ void BRTxOutputSetAddress(BRTxOutput *output, const char *address)
     }
 }
 
+void BRTxOutputSetAmount(BRTxOutput* output, uint64_t amount) {
+    assert(output != NULL);
+    output->amount = amount;
+}
+
 void BRTxOutputSetScript(BRTxOutput *output, const uint8_t *script, size_t scriptLen)
 {
     assert(output != NULL);
@@ -538,6 +543,29 @@ void BRTransactionAddInput(BRTransaction *tx, UInt256 txHash, uint32_t index, ui
         if (signature) BRTxInputSetSignature(&input, signature, sigLen);
         if (witness) BRTxInputSetWitness(&input, witness, witLen);
         array_add(tx->inputs, input);
+        tx->inCount = array_count(tx->inputs);
+    }
+}
+
+// adds an input to tx to the beginning
+void BRTransactionAddInputBefore(BRTransaction *tx, UInt256 txHash, uint32_t index, uint64_t amount,
+                           const uint8_t *script, size_t scriptLen, const uint8_t *signature, size_t sigLen,
+                           const uint8_t *witness, size_t witLen, uint32_t sequence)
+{
+    BRTxInput input = { txHash, index, "", amount, NULL, 0, NULL, 0, NULL, 0, sequence };
+
+    assert(tx != NULL);
+    assert(! UInt256IsZero(txHash));
+    assert(script != NULL || scriptLen == 0);
+    assert(signature != NULL || sigLen == 0);
+    assert(witness != NULL || witLen == 0);
+    
+    if (tx) {
+        if (script) BRTxInputSetScript(&input, script, scriptLen);
+        if (signature) BRTxInputSetSignature(&input, signature, sigLen);
+        if (witness) BRTxInputSetWitness(&input, witness, witLen);
+        
+        array_insert(tx->inputs, 0, input);
         tx->inCount = array_count(tx->inputs);
     }
 }

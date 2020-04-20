@@ -442,12 +442,14 @@ int BRAddressIsValid(const char *addr)
 // writes the 20 byte hash160 of addr to md20 and returns true on success
 int BRAddressHash160(void *md20, const char *addr)
 {
-    uint8_t data[21];
+    char hrp[84];
+    uint8_t data[42];
     int r = 0;
     
     assert(md20 != NULL);
     assert(addr != NULL);
-    r = (BRBase58CheckDecode(data, sizeof(data), addr) == 21);
-    if (r) memcpy(md20, &data[1], 20);
+    r = (BRBase58CheckDecode(&data[1], sizeof(data) - 1, addr) == 21 ||
+         BRBech32Decode(hrp, data, addr) == 22);
+    if (r) memcpy(md20, &data[2], 20);
     return r;
 }

@@ -176,7 +176,7 @@ inline static int _BRBlockHeightEq(const void *block, const void *otherBlock)
 struct BRPeerManagerStruct {
     const BRChainParams *params;
     BRWallet *wallet;
-    int isConnected, connectFailureCount, misbehavinCount, dnsThreadCount, maxConnectCount;
+    int isConnected, connectFailureCount, misbehavinCount, dnsThreadCount, maxConnectCount, peerThreadCount;
     BRPeer *peers, *downloadPeer, fixedPeer, **connectedPeers;
     char downloadPeerName[INET6_ADDRSTRLEN + 6];
     uint32_t earliestKeyTime, syncStartHeight, filterUpdateHeight, estimatedHeight;
@@ -291,9 +291,11 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
     // every time a new wallet address is added, the bloom filter has to be rebuilt, and each address is only used
     // for one transaction, so here we generate some spare addresses to avoid rebuilding the filter each time a
     // wallet transaction is encountered during the chain sync
-    BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_EXTERNAL + 100, 0);
-    BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_INTERNAL + 100, 1);
-
+    BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_EXTERNAL + 100, 0, 1);
+    BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_INTERNAL + 100, 1, 1);
+    BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_EXTERNAL + 100, 0, 0);
+    BRWalletUnusedAddrs(manager->wallet, NULL, SEQUENCE_GAP_LIMIT_INTERNAL + 100, 1, 0);
+    
     BRSetApply(manager->orphans, NULL, _setApplyFreeBlock);
     BRSetClear(manager->orphans); // clear out orphans that may have been received on an old filter
     manager->lastOrphan = NULL;
@@ -301,9 +303,9 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
     manager->fpRate = BLOOM_REDUCED_FALSEPOSITIVE_RATE;
     
     size_t addrsCount = BRWalletAllAddrs(manager->wallet, NULL, 0);
-    BRAddress *addrs = malloc(addrsCount*sizeof(*addrs));
+    BRAddress *addrs = malloc(addrsCount * sizeof(*addrs));
     size_t utxosCount = BRWalletUTXOs(manager->wallet, NULL, 0);
-    BRUTXO *utxos = malloc(utxosCount*sizeof(*utxos));
+    BRUTXO *utxos = malloc(utxosCount * sizeof(*utxos));
     uint32_t blockHeight = (manager->lastBlock->height > 100) ? manager->lastBlock->height - 100 : 0;
     size_t txCount = BRWalletTxUnconfirmedBefore(manager->wallet, NULL, 0, blockHeight);
     BRTransaction **transactions = malloc(txCount*sizeof(*transactions));
@@ -315,10 +317,10 @@ static void _BRPeerManagerLoadBloomFilter(BRPeerManager *manager, BRPeer *peer)
     addrsCount = BRWalletAllAddrs(manager->wallet, addrs, addrsCount);
     utxosCount = BRWalletUTXOs(manager->wallet, utxos, utxosCount);
     txCount = BRWalletTxUnconfirmedBefore(manager->wallet, transactions, txCount, blockHeight);
-    filter = BRBloomFilterNew(manager->fpRate, addrsCount + utxosCount + txCount + 100, (uint32_t)BRPeerHash(peer),
+    filter = BRBloomFilterNew(manager->fpRate, addrsCount + utxosCount + txCount + 100, (uint32_t) BRPeerHash(peer),
                               BLOOM_UPDATE_ALL); // BUG: XXX txCount not the same as number of spent wallet outputs
     
-    for (size_t i = 0; i < addrsCount; i++) { // add addresses to watch for tx receiveing money to the wallet
+    for (size_t i = 0; i < addrsCount; i++) { // add addresses to watch for tx receiving money to the wallet
         UInt160 hash = UINT160_ZERO;
         
         BRAddressHash160(&hash, addrs[i].s);
@@ -1016,12 +1018,25 @@ static void _peerRelayedTx(void *info, BRTransaction *tx)
         if (manager->bloomFilter != NULL) { // check if bloom filter is already being updated
             BRAddress addrs[SEQUENCE_GAP_LIMIT_EXTERNAL + SEQUENCE_GAP_LIMIT_INTERNAL];
             UInt160 hash;
-
+            
             // the transaction likely consumed one or more wallet addresses, so check that at least the next <gap limit>
             // unused addresses are still matched by the bloom filter
-            BRWalletUnusedAddrs(manager->wallet, addrs, SEQUENCE_GAP_LIMIT_EXTERNAL, 0);
-            BRWalletUnusedAddrs(manager->wallet, addrs + SEQUENCE_GAP_LIMIT_EXTERNAL, SEQUENCE_GAP_LIMIT_INTERNAL, 1);
+            BRWalletUnusedAddrs(manager->wallet, addrs, SEQUENCE_GAP_LIMIT_EXTERNAL, 0, 0);
+            BRWalletUnusedAddrs(manager->wallet, addrs + SEQUENCE_GAP_LIMIT_EXTERNAL, SEQUENCE_GAP_LIMIT_INTERNAL, 1, 0);
 
+            for (size_t i = 0; i < SEQUENCE_GAP_LIMIT_EXTERNAL + SEQUENCE_GAP_LIMIT_INTERNAL; i++) {
+                if (! BRAddressHash160(&hash, addrs[i].s) ||
+                    BRBloomFilterContainsData(manager->bloomFilter, hash.u8, sizeof(hash))) continue;
+                if (manager->bloomFilter) BRBloomFilterFree(manager->bloomFilter);
+                manager->bloomFilter = NULL; // reset bloom filter so it's recreated with new wallet addresses
+                _BRPeerManagerUpdateFilter(manager);
+                break;
+            }
+            
+            // Do the same for segwit addresses again
+            BRWalletUnusedAddrs(manager->wallet, addrs, SEQUENCE_GAP_LIMIT_EXTERNAL, 0, 1);
+            BRWalletUnusedAddrs(manager->wallet, addrs + SEQUENCE_GAP_LIMIT_EXTERNAL, SEQUENCE_GAP_LIMIT_INTERNAL, 1, 1);
+            
             for (size_t i = 0; i < SEQUENCE_GAP_LIMIT_EXTERNAL + SEQUENCE_GAP_LIMIT_INTERNAL; i++) {
                 if (! BRAddressHash160(&hash, addrs[i].s) ||
                     BRBloomFilterContainsData(manager->bloomFilter, hash.u8, sizeof(hash))) continue;
@@ -1576,6 +1591,10 @@ static void _peerThreadCleanup(void *info)
 {
     BRPeerManager *manager = ((BRPeerCallbackInfo *)info)->manager;
 
+    pthread_mutex_lock(&manager->lock);
+    manager->peerThreadCount--;
+    pthread_mutex_unlock(&manager->lock);
+    
     free(info);
     if (manager->threadCleanup) manager->threadCleanup(manager->info);
 }
@@ -1797,11 +1816,19 @@ void BRPeerManagerConnect(BRPeerManager *manager)
                 *info->peer = peers[i];
                 array_rm(peers, i);
                 array_add(manager->connectedPeers, info->peer);
+                manager->peerThreadCount++;
                 BRPeerSetCallbacks(info->peer, info, _peerConnected, _peerDisconnected, _peerRelayedPeers,
                                    _peerRelayedTx, _peerHasTx, _peerRejectedTx, _peerRelayedBlock, _peerDataNotfound,
                                    _peerSetFeePerKb, _peerRequestedTx, _peerNetworkIsReachable, _peerThreadCleanup);
                 BRPeerSetEarliestKeyTime(info->peer, manager->earliestKeyTime);
                 BRPeerConnect(info->peer);
+                
+                if (BRPeerConnectStatus(info->peer) == BRPeerStatusDisconnected) {
+                    pthread_mutex_unlock(&manager->lock);
+                    _peerDisconnected(info, ENOTCONN);
+                    pthread_mutex_lock(&manager->lock);
+                    manager->peerThreadCount--;
+                }
             }
         }
 
@@ -1820,29 +1847,40 @@ void BRPeerManagerConnect(BRPeerManager *manager)
 void BRPeerManagerDisconnect(BRPeerManager *manager)
 {
     struct timespec ts;
-    size_t peerCount, dnsThreadCount;
+    size_t peerThreadCount, dnsThreadCount, maxConnectCount;
+    BRPeer *p;
     
     assert(manager != NULL);
     pthread_mutex_lock(&manager->lock);
-    peerCount = array_count(manager->connectedPeers);
-    dnsThreadCount = manager->dnsThreadCount;
     
-    for (size_t i = peerCount; i > 0; i--) {
+    // prevent new peers from being spawned
+    maxConnectCount = manager->maxConnectCount;
+    manager->maxConnectCount = 0;
+    
+    for (size_t i = array_count(manager->connectedPeers); i > 0; i--) {
+        p = manager->connectedPeers[i - 1];
         manager->connectFailureCount = MAX_CONNECT_FAILURES; // prevent futher automatic reconnect attempts
-        BRPeerDisconnect(manager->connectedPeers[i - 1]);
+        BRPeerDisconnect(p);
+        if (BRPeerConnectStatus(p) == BRPeerStatusConnecting) manager->peerThreadCount--; // waiting for network
     }
     
+    peerThreadCount = manager->peerThreadCount;
+    dnsThreadCount = manager->dnsThreadCount;
     pthread_mutex_unlock(&manager->lock);
     ts.tv_sec = 0;
     ts.tv_nsec = 1;
     
-    while (peerCount > 0 || dnsThreadCount > 0) {
+    while (peerThreadCount > 0 || dnsThreadCount > 0) {
         nanosleep(&ts, NULL); // pthread_yield() isn't POSIX standard :(
         pthread_mutex_lock(&manager->lock);
-        peerCount = array_count(manager->connectedPeers);
+        peerThreadCount = manager->peerThreadCount;
         dnsThreadCount = manager->dnsThreadCount;
         pthread_mutex_unlock(&manager->lock);
     }
+    
+    pthread_mutex_lock(&manager->lock);
+    manager->maxConnectCount = maxConnectCount;
+    pthread_mutex_unlock(&manager->lock);
 }
 
 // rescans blocks and transactions after earliestKeyTime (a new random download peer is also selected due to the
@@ -1927,7 +1965,7 @@ uint32_t BRPeerManagerLastBlockTimestamp(BRPeerManager *manager)
 
 // current network sync progress from 0 to 1
 // startHeight is the block height of the most recent fully completed sync
-double BRPeerManagerSyncProgress(BRPeerManager *manager, uint32_t startHeight)
+double  BRPeerManagerSyncProgress(BRPeerManager *manager, uint32_t startHeight)
 {
     double progress;
     
@@ -1940,9 +1978,9 @@ double BRPeerManagerSyncProgress(BRPeerManager *manager, uint32_t startHeight)
     }
     else if (! manager->downloadPeer || manager->lastBlock->height < manager->estimatedHeight) {
         if (manager->lastBlock->height > startHeight && manager->estimatedHeight > startHeight) {
-            progress = 0.1 + 0.9*(manager->lastBlock->height - startHeight)/(manager->estimatedHeight - startHeight);
+            progress = 0.001 + 0.999 * (manager->lastBlock->height - startHeight)/(manager->estimatedHeight - startHeight);
         }
-        else progress = 0.05;
+        else progress = 0.001;
     }
     else progress = 1.0;
 

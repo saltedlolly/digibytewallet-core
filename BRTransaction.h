@@ -27,6 +27,7 @@
 
 #include "BRKey.h"
 #include "BRInt.h"
+#include "BRAssetData.h"
 #include <stddef.h>
 #include <inttypes.h>
 
@@ -57,7 +58,7 @@ uint32_t BRRand(uint32_t upperBound);
 typedef struct {
     UInt256 txHash;
     uint32_t index;
-    char address[36];
+    char address[44];
     uint64_t amount;
     uint8_t *script;
     size_t scriptLen;
@@ -66,6 +67,8 @@ typedef struct {
     uint8_t *witness;
     size_t witLen;
     uint32_t sequence;
+    BRAssetData* digiAssets;
+    size_t assetCount;
 } BRTxInput;
 
 void BRTxInputSetAddress(BRTxInput *input, const char *address);
@@ -74,7 +77,7 @@ void BRTxInputSetSignature(BRTxInput *input, const uint8_t *signature, size_t si
 void BRTxInputSetWitness(BRTxInput *input, const uint8_t *witness, size_t witLen);
 
 typedef struct {
-    char address[36];
+    char address[44];
     uint64_t amount;
     uint8_t *script;
     size_t scriptLen;
@@ -84,6 +87,7 @@ typedef struct {
 
 // when creating a BRTxOutput struct outside of a BRTransaction, set address or script to NULL when done to free memory
 void BRTxOutputSetAddress(BRTxOutput *output, const char *address);
+void BRTxOutputSetAmount(BRTxOutput* output, uint64_t amount);
 void BRTxOutputSetScript(BRTxOutput *output, const uint8_t *script, size_t scriptLen);
 
 typedef struct {
@@ -118,6 +122,11 @@ size_t BRTransactionSerialize(const BRTransaction *tx, uint8_t *buf, size_t bufL
 void BRTransactionAddInput(BRTransaction *tx, UInt256 txHash, uint32_t index, uint64_t amount,
                            const uint8_t *script, size_t scriptLen, const uint8_t *signature, size_t sigLen,
                            const uint8_t *witness, size_t witLen, uint32_t sequence);
+
+// adds an input to the tx (to index 0)
+void BRTransactionAddInputBefore(BRTransaction *tx, UInt256 txHash, uint32_t index, uint64_t amount,
+                                 const uint8_t *script, size_t scriptLen, const uint8_t *signature, size_t sigLen,
+                                 const uint8_t *witness, size_t witLen, uint32_t sequence);
 
 // adds an output to tx
 void BRTransactionAddOutput(BRTransaction *tx, uint64_t amount, const uint8_t *script, size_t scriptLen);

@@ -116,12 +116,16 @@ void BRWalletSetCallbacks(BRWallet *wallet, void *info,
 // this function writes to addrs an array of <gapLimit> unused addresses following the last used address in the chain
 // the internal chain is used for change addresses and the external chain for receive addresses
 // addrs may be NULL to only generate addresses for BRWalletContainsAddress()
+// nativeSegwit to generate a native segwit address
 // returns the number addresses written to addrs
-size_t BRWalletUnusedAddrs(BRWallet *wallet, BRAddress addrs[], uint32_t gapLimit, int internal);
+size_t BRWalletUnusedAddrs(BRWallet *wallet, BRAddress addrs[], uint32_t gapLimit, int internal, int nativeSegwit);
 
 // returns the first unused external address
-BRAddress BRWalletReceiveAddress(BRWallet *wallet);
+BRAddress BRWalletReceiveAddress(BRWallet *wallet, int useSegwit);
 
+// returns the first unused internal address
+BRAddress BRWalletInternalChangeAddress(BRWallet *wallet);
+    
 // writes all addresses previously genereated with BRWalletUnusedAddrs() to addrs
 // returns the number addresses written, or total number available if addrs is NULL
 size_t BRWalletAllAddrs(BRWallet *wallet, BRAddress addrs[], size_t addrsCount);
@@ -219,6 +223,9 @@ uint64_t BRWalletFeeForTxSize(BRWallet *wallet, size_t size);
 
 // fee that will be added for a transaction of the given amount
 uint64_t BRWalletFeeForTxAmount(BRWallet *wallet, uint64_t amount);
+    
+// fee that will be added for a transaction of the given amount, without failing due to missing balances
+uint64_t BRWalletForceFeeForTxAmount(BRWallet *wallet, uint64_t amount);
 
 // outputs below this amount are uneconomical due to fees (TX_MIN_OUTPUT_AMOUNT is the absolute minimum output amount)
 uint64_t BRWalletMinOutputAmount(BRWallet *wallet);
@@ -237,60 +244,13 @@ int64_t BRLocalAmount(int64_t amount, double price);
 // price is local currency units (i.e. pennies, pence) per bitcoin
 int64_t BRBitcoinAmount(int64_t localAmount, double price);
 
-/*
-              DIGI-
-      _                _
-     /_\  ___ ___  ___| |_ ___
-    //_\\/ __/ __|/ _ \ __/ __|
-   /  _  \__ \__ \  __/ |_\__ \
-   \_/ \_/___/___/\___|\__|___/
- */
-
-// First word must be zero, second must not be zero
-#define DA_IS_ISSUANCE(byte) ((~(byte) & 0xF0) && ((byte) & 0x0F))
-// First word must be 1
-#define DA_IS_TRANSFER(byte) ((byte) & 0x10)
-// First word must be 2
-#define DA_IS_BURN(byte)     ((byte) & 0x20)
-
-#define DA_TYPE_SHA1_META_SHA256      0x01
-#define DA_TYPE_SHA1_MS12_SHA256      0x02
-#define DA_TYPE_SHA1_MS13_SHA256      0x03
-#define DA_TYPE_SHA1_META             0x04
-#define DA_TYPE_SHA1_NO_META_LOCKED   0x05
-#define DA_TYPE_SHA1_NO_META_UNLOCKED 0x06
-
-#define DA_ASSET_DUST_AMOUNT 700
-
-typedef enum {
-    DA_UNDEFINED,
-    DA_ISSUANCE,
-    DA_TRANSFER,
-    DA_BURN
-} BRAssetOperation;
-
-typedef struct {
-    uint16_t info_hash[20];
-    uint16_t metadata[32];
-    
-    uint8_t version;
-    uint8_t has_metadata;
-    uint8_t has_infohash;
-    BRAssetOperation type;
-    uint8_t locked;
-} BRAssetData;
-
 BRUTXO * BRGetUTXO(BRWallet *wallet);
 
-BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo);
-
-uint8_t BRTXContainsAsset(BRTransaction *tx);
-
-uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount);
-
-uint8_t BROutpointIsAsset(const BRTxOutput* output);
+int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index);
 
 BRTransaction* BRGetTransactions(BRWallet *wallet);
+
+BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo);
 
 uint8_t BROutputSpendable(BRWallet *wallet, const BRTxOutput output);
 
