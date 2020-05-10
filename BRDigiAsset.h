@@ -44,8 +44,10 @@ uint8_t BRContainsAsset(const BRTxOutput *outputs, size_t outCount);
 
 uint8_t BROutpointIsAsset(const BRTxOutput* output);
 
-uint8_t BRDecodeAsset(const BRTxOutput* output, BRAssetData* data);
+uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* output);
 
 uint8_t BROutpointIsAsset(const BRTxOutput* output);
+
+uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* output);
 
 #endif /* BRDigiAsset_h */

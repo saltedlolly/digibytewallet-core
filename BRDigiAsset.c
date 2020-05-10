@@ -2,7 +2,7 @@
 //  BRDigiAsset.c
 //  DigiByte
 //
-//  Created by Julian Jäger on 05.10.19.
+//  Created by Yoshi Jaeger on 05.10.19.
 //  Copyright © 2019 DigiByte Foundation NZ Limited. All rights reserved.
 //
 
@@ -10,6 +10,7 @@
 #include "BRWallet.h"
 #include "BRTransaction.h"
 #include "BRArray.h"
+#include <math.h>
 
 uint8_t BRTXContainsAsset(BRTransaction *tx)
 {
@@ -58,63 +59,122 @@ uint8_t BROutpointIsAsset(const BRTxOutput* output)
     return length;
 }
 
+typedef struct {
+    uint8_t exponent;
+    uint8_t byteSize;
+    uint8_t mantis;
+    uint8_t skipBits;
+} sffcEntry;
+
+const sffcEntry sffcTable[] = {
+    { 0, 1, 5, 3 },
+    { 4, 2, 9, 3 },
+    { 4, 3, 17, 3 },
+    { 4, 4, 25, 3 },
+    { 3, 5, 34, 3 },
+    { 3, 6, 42, 3 },
+    { 0, 7, 54, 2 },
+};
+
 /*
- * Returns 1 if asset was decoded correctly, otherwise zero.
+ * Returns 1 if an asset was sent to the output
  */
-uint8_t BRDecodeAsset(const BRTxOutput* output, BRAssetData* data) {
+uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* output) {
+    size_t idx = -1;
+    size_t op_return_idx = -1;
+    
+    // Parse instruction
+    BRTxOutput* or_output = NULL;
     uint8_t* ptr;
     uint8_t length;
     uint8_t type;
-
-    if (output == NULL || data == NULL) return 0;
-    if (!(length = BROutpointIsAsset(output))) return 0;
-    ptr = output->script + 4; /* OP_RETURN + LEN + TAG */
+    uint8_t version;
     
-    memset(data, 0, sizeof(BRAssetData));
+    // 1) Check if output is part of transaction
+    // 2) Search op_return output
+    for (size_t i = 0; i < transaction->outCount; ++i) {
+        uint8_t l;
+        
+        if (&transaction->outputs[i] == output)
+            idx = i;
+        
+        l = BROutpointIsAsset(&transaction->outputs[i]);
+        if (l) {
+            or_output = &transaction->outputs[i];
+            length = l;
+        }
+    }
     
-    data->version = *ptr;
+    if (idx == -1) return 0;
+    if (or_output == NULL) return 0;
+    
+    ptr = or_output->script + 4; /* OP_RETURN + LEN + TAG(2) */
+    version = *ptr;
     ptr++;
     
     type = *ptr;
     
-    if (DA_IS_ISSUANCE(type)) {
-        data->type = DA_ISSUANCE;
-    } else if (DA_IS_TRANSFER(type)) {
-        data->type = DA_TRANSFER;
-    } else if (DA_IS_BURN(type)) {
-        data->type = DA_BURN;
+    if (!DA_IS_TRANSFER(type)) {
+        return 0;
     }
     
-    /*
-     * Note that a buffer length check was performed in
-     * BROutpointIsAsset.
-     */
-    if (type & DA_TYPE_SHA1_META_SHA256) {
-        assert(length == 2 + 1 + 20 + 32 && "Invalid length");
-        memcpy(&data->info_hash[0], ptr, 20);
-        memcpy(&data->metadata[0], ptr, 32);
-        data->has_infohash = 1;
-        data->has_metadata = 1;
+    {
+        // Parse the instructions
+        uint16_t outputIdx;
+        uint8_t inputIdx = 0;
+        uint8_t skip = 0, range = 0, percent = 0;
+        uint64_t amount = 0;
         
-    } else if (type & DA_TYPE_SHA1_MS12_SHA256) {
-        
-    } else if (type & DA_TYPE_SHA1_MS13_SHA256) {
-        
-    } else if (type & DA_TYPE_SHA1_META) {
-        assert(length == 2 + 1 + 20 && "Invalid length");
-        memcpy(&data->info_hash[0], ptr, 20);
-        data->has_infohash = 1;
-        
-    } else if (type & DA_TYPE_SHA1_NO_META_LOCKED) {
-        data->locked = 1;
-        
-    } else if (type & DA_TYPE_SHA1_NO_META_UNLOCKED) {
-        data->locked = 0;
-        
-    } else {
+        ++ptr;
+        while (ptr - or_output->script < or_output->scriptLen - 1) {
+            uint8_t flags = *ptr++;
+            
+            skip = !!(flags & (1 << 7));
+            range = !!(flags & (1 << 6));
+            percent = !!(flags & (1 << 5));
+            outputIdx = flags & (~0xE0);
+            if (range) {
+                uint8_t outputIdx2 = *ptr++;
+                // output size = 13 bits
+                outputIdx = outputIdx | (outputIdx2 << 8);
+            }
+            
+            if (percent) {
+                amount = *ptr++;
+            } else {
+                uint8_t flagsLen = (*ptr & 0xe0) >> 5;
+                if (flagsLen & 0x0F == 0x07) flagsLen = 6;
+                
+                assert(flagsLen <= 6 && "sffc out of range");
+                sffcEntry* data = &sffcTable[flagsLen];
+                amount = UInt64GetBE(ptr); // safe because scriptLen (64) is after script
+                ptr += data->byteSize;
+                
+                // mask flag bits
+                for (uint8_t mask0 = 0; mask0 < data->skipBits; ++mask0) {
+                    uint64_t mask = (1UL << (63 - mask0));
+                    amount &= ~mask;
+                }
+                
+                // shift bits to the LSB
+                amount >>= (64 - data->byteSize * 8);
+                
+                uint64_t expShift = pow(2, data->exponent);
+                uint64_t exp = amount % expShift;
+                uint64_t mantis = amount / expShift;
+                amount = mantis * pow(10, exp);
+            }
+            
+            printf("skip=%d, range=%d, percent=%d, inputIdx=%d, outputIdx=%d, amount=%ld%s\n", skip, range, percent, inputIdx, outputIdx, amount, percent ? "%" : "");
+            
+            // Some asset went to output-index `idx`
+            if (outputIdx == idx)
+                return 1;
+            if (skip) inputIdx++;
+        }
     }
     
-    return 1;
+    return 0;
 }
 
 

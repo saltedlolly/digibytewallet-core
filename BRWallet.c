@@ -39,6 +39,7 @@ struct BRWalletStruct {
     uint64_t balance, totalSent, totalReceived, feePerKb, *balanceHist;
     uint32_t blockHeight;
     BRUTXO *utxos;
+    BRUTXO *assetUtxos;
     BRTransaction **transactions;
     BRMasterPubKey masterPubKey;
     BRAddress *internalChain, *externalChain;
@@ -169,6 +170,7 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
     BRTxOutput o;
 
     array_clear(wallet->utxos);
+    array_clear(wallet->assetUtxos);
     array_clear(wallet->balanceHist);
     BRSetClear(wallet->spentOutputs);
     BRSetClear(wallet->invalidTx);
@@ -227,8 +229,6 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
         // TODO: don't add outputs below TX_MIN_OUTPUT_AMOUNT
         // TODO: don't add coin generation outputs < 100 blocks deep
         // NOTE: balance/UTXOs will then need to be recalculated when last block changes
-        uint8_t containsAsset = BRTXContainsAsset(tx);
-        
         for (j = 0; j < tx->outCount; j++) {
             if (tx->outputs[j].address[0] != '\0') {
                 BRSetAdd(wallet->usedAddrs, tx->outputs[j].address);
@@ -237,7 +237,10 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
                     // If the tx contains an asset, we will skip the DUST transactions,
                     // otherwise there would be a chance of burning the received assets.
                     // Hence, skip adding the 600 dsatoshi transactions to the utxos.
-                    if (containsAsset && tx->outputs[j].amount <= DA_ASSET_DUST_AMOUNT) continue;
+                    if (BROutputIsAsset(tx, &tx->outputs[j])) {
+                        array_add(wallet->assetUtxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
+                        continue;
+                    }
                     
                     // Add the UTXO to the internal list of utxos and add the balance
                     array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
@@ -278,6 +281,7 @@ BRWallet *BRWalletNew(BRTransaction *transactions[], size_t txCount, BRMasterPub
     wallet = calloc(1, sizeof(*wallet));
     assert(wallet != NULL);
     array_new(wallet->utxos, 100);
+    array_new(wallet->assetUtxos, 30);
     array_new(wallet->transactions, txCount + 100);
     wallet->feePerKb = DEFAULT_FEE_PER_KB;
     wallet->masterPubKey = mpk;
@@ -564,6 +568,15 @@ BRAddress BRWalletReceiveAddress(BRWallet *wallet, int useSegwitAddress)
     return addr;
 }
 
+// returns the first unused internal address
+BRAddress BRWalletInternalChangeAddress(BRWallet *wallet)
+{
+    BRAddress addr = BR_ADDRESS_NONE;
+    
+    BRWalletUnusedAddrs(wallet, &addr, 1, 1, 1);
+    return addr;
+}
+
 // writes all addresses previously genereated with BRWalletUnusedAddrs() to addrs
 // returns the number addresses written, or total number available if addrs is NULL
 size_t BRWalletAllAddrs(BRWallet *wallet, BRAddress addrs[], size_t addrsCount)
@@ -683,7 +696,8 @@ BRTransaction *BRWalletCreateTxForOutputsEx(BRWallet *wallet, const BRTxOutput o
         tx = BRSetGet(wallet->allTx, o);
         
         if (! tx || o->n >= tx->outCount) continue;
-        if (BROutpointIsAsset(&tx->outputs[o->n])) continue;
+        if (BROutputIsAsset(tx, o)) continue;
+
         BRTransactionAddInput(transaction, tx->txHash, o->n, tx->outputs[o->n].amount,
                               tx->outputs[o->n].script, tx->outputs[o->n].scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);
         
@@ -1315,6 +1329,8 @@ void BRWalletFree(BRWallet *wallet)
     BRSetFree(wallet->spentOutputs);
     array_free(wallet->internalChain);
     array_free(wallet->externalChain);
+    array_free(wallet->externalChainSegwit);
+    array_free(wallet->internalChainSegwit);
     array_free(wallet->balanceHist);
 
     for (size_t i = array_count(wallet->transactions); i > 0; i--) {
@@ -1323,6 +1339,7 @@ void BRWalletFree(BRWallet *wallet)
 
     array_free(wallet->transactions);
     array_free(wallet->utxos);
+    array_free(wallet->assetUtxos);
     pthread_mutex_unlock(&wallet->lock);
     pthread_mutex_destroy(&wallet->lock);
     free(wallet);
@@ -1385,6 +1402,18 @@ BRTransaction* BRGetTransactions(BRWallet *wallet)
 BRUTXO* BRGetUTXO(BRWallet *wallet)
 {
     return wallet->utxos;
+}
+
+int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index) {    
+    UInt256 hash = UInt256Reverse(uint256(txid));
+    
+    for (size_t j = array_count(wallet->assetUtxos); j > 0; j--) {
+        BRUTXO* utxo = &wallet->assetUtxos[j - 1];
+//        printf("Checking\n\t%s\n\t%s", u256hex(hash), u256hex(utxo->hash));
+        if (UInt256Eq(utxo->hash, hash) && utxo->n == index) return 1;
+    }
+    
+    return 0;
 }
 
 BRTransaction* BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)

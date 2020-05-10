@@ -87,6 +87,7 @@ typedef struct {
 
 // when creating a BRTxOutput struct outside of a BRTransaction, set address or script to NULL when done to free memory
 void BRTxOutputSetAddress(BRTxOutput *output, const char *address);
+void BRTxOutputSetAmount(BRTxOutput* output, uint64_t amount);
 void BRTxOutputSetScript(BRTxOutput *output, const uint8_t *script, size_t scriptLen);
 
 typedef struct {
@@ -101,8 +102,6 @@ typedef struct {
     uint32_t blockHeight;
     uint32_t timestamp; // time interval since unix epoch
     uint8_t is_dandelion;
-//    BRAssetData* digiassets;
-//    size_t assetCount;
 } BRTransaction;
 
 // returns a newly allocated empty transaction that must be freed by calling BRTransactionFree()
@@ -123,6 +122,11 @@ size_t BRTransactionSerialize(const BRTransaction *tx, uint8_t *buf, size_t bufL
 void BRTransactionAddInput(BRTransaction *tx, UInt256 txHash, uint32_t index, uint64_t amount,
                            const uint8_t *script, size_t scriptLen, const uint8_t *signature, size_t sigLen,
                            const uint8_t *witness, size_t witLen, uint32_t sequence);
+
+// adds an input to the tx (to index 0)
+void BRTransactionAddInputBefore(BRTransaction *tx, UInt256 txHash, uint32_t index, uint64_t amount,
+                                 const uint8_t *script, size_t scriptLen, const uint8_t *signature, size_t sigLen,
+                                 const uint8_t *witness, size_t witLen, uint32_t sequence);
 
 // adds an output to tx
 void BRTransactionAddOutput(BRTransaction *tx, uint64_t amount, const uint8_t *script, size_t scriptLen);

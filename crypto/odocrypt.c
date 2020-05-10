@@ -2,7 +2,7 @@
 //  odocrypt.c
 //  DigiByte
 //
-//  Created by Julian Jäger on 22.07.19.
+//  Created by Yoshi Jaeger on 22.07.19.
 //  Copyright © 2019 DigiByte Foundation NZ Limited. All rights reserved.
 //
 
