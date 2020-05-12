@@ -248,6 +248,8 @@ BRUTXO * BRGetUTXO(BRWallet *wallet);
 
 int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index);
 
+int BRWalletUtxoSpendable(BRWallet* wallet, const char* txid, int index);
+
 BRTransaction* BRGetTransactions(BRWallet *wallet);
 
 BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo);

@@ -983,16 +983,19 @@ int BRWalletTransactionIsValid(BRWallet *wallet, const BRTransaction *tx)
 
         if (! BRSetContains(wallet->allTx, tx)) {
             for (size_t i = 0; r && i < tx->inCount; i++) {
-                if (BRSetContains(wallet->spentOutputs, &tx->inputs[i])) r = 0;
+                if (BRSetContains(wallet->spentOutputs, &tx->inputs[i]))
+                    r = 0;
             }
         }
-        else if (BRSetContains(wallet->invalidTx, tx)) r = 0;
+        else if (BRSetContains(wallet->invalidTx, tx))
+            r = 0;
 
         pthread_mutex_unlock(&wallet->lock);
 
         for (size_t i = 0; r && i < tx->inCount; i++) {
             t = BRWalletTransactionForHash(wallet, tx->inputs[i].txHash);
-            if (t && ! BRWalletTransactionIsValid(wallet, t)) r = 0;
+            if (t && ! BRWalletTransactionIsValid(wallet, t))
+                r = 0;
         }
     }
     
@@ -1409,11 +1412,22 @@ int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index) {
     
     for (size_t j = array_count(wallet->assetUtxos); j > 0; j--) {
         BRUTXO* utxo = &wallet->assetUtxos[j - 1];
-//        printf("Checking\n\t%s\n\t%s", u256hex(hash), u256hex(utxo->hash));
         if (UInt256Eq(utxo->hash, hash) && utxo->n == index) return 1;
     }
     
     return 0;
+}
+
+// Same as BROutputSpendable, but callable from Swift
+int BRWalletUtxoSpendable(BRWallet* wallet, const char* txid, int index) {
+    UInt256 hash = UInt256Reverse(uint256(txid));
+    
+    BRTxInput input;
+    input.txHash = UInt256Reverse(uint256(txid));
+    input.index = index;
+
+    if (BRSetContains(wallet->spentOutputs, &input)) return 0;
+    return 1;
 }
 
 BRTransaction* BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
