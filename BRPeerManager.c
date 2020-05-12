@@ -2122,9 +2122,9 @@ void BRPeerManagerFree(BRPeerManager *manager)
     BRSetApply(manager->orphans, NULL, _setApplyFreeBlock);
     BRSetFree(manager->orphans);
     BRSetFree(manager->checkpoints);
-    for (size_t i = array_count(manager->txRelays); i > 0; i--) free(manager->txRelays[i - 1].peers);
+    for (size_t i = array_count(manager->txRelays); i > 0; i--) array_free(manager->txRelays[i - 1].peers);
     array_free(manager->txRelays);
-    for (size_t i = array_count(manager->txRequests); i > 0; i--) free(manager->txRequests[i - 1].peers);
+    for (size_t i = array_count(manager->txRequests); i > 0; i--) array_free(manager->txRequests[i - 1].peers);
     array_free(manager->txRequests);
     array_free(manager->publishedTx);
     array_free(manager->publishedTxHashes);
