@@ -250,6 +250,8 @@ int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index);
 
 int BRWalletUtxoSpendable(BRWallet* wallet, const char* txid, int index);
 
+void BRWalletPrintUtxos(BRWallet* wallet);
+
 BRTransaction* BRGetTransactions(BRWallet *wallet);
 
 BRTransaction * BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo);

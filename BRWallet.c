@@ -1430,6 +1430,30 @@ int BRWalletUtxoSpendable(BRWallet* wallet, const char* txid, int index) {
     return 1;
 }
 
+void _printUtxo(void* info, void* utxo) {
+    BRUTXO* u = utxo;
+    printf("  UTXO %s %d\n", u256hex(UInt256Reverse(u->hash)), u->n);
+}
+
+void BRWalletPrintUtxos(BRWallet* wallet) {
+#if DEBUG
+    size_t count;
+    
+    printf("UTXOS:\n");
+    for (size_t j = array_count(wallet->utxos); j > 0; j--) {
+        _printUtxo(NULL, &wallet->utxos[j - 1]);
+    }
+    
+    printf("ASSET UTXOS:\n");
+    for (size_t j = array_count(wallet->assetUtxos); j > 0; j--) {
+        _printUtxo(NULL, &wallet->assetUtxos[j - 1]);
+    }
+    
+    printf("SPENT UTXOS:\n");
+    BRSetApply(wallet->spentOutputs, NULL, _printUtxo);
+#endif
+}
+
 BRTransaction* BRGetTxForUTXO(BRWallet *wallet, BRUTXO utxo)
 {
     BRTransaction *t = BRSetGet(wallet->allTx, &utxo.hash);

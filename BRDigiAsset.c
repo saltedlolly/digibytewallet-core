@@ -114,7 +114,7 @@ uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* outp
     
     type = *ptr;
     
-    if (!DA_IS_TRANSFER(type)) {
+    if (!DA_IS_TRANSFER(type) && !DA_IS_BURN(type)) {
         return 0;
     }
     
@@ -124,6 +124,7 @@ uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* outp
         uint8_t inputIdx = 0;
         uint8_t skip = 0, range = 0, percent = 0;
         uint64_t amount = 0;
+        uint8_t burn = 0;
         
         ++ptr;
         while (ptr - or_output->script < or_output->scriptLen - 1) {
@@ -165,11 +166,12 @@ uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* outp
                 amount = mantis * pow(10, exp);
             }
             
-            printf("skip=%d, range=%d, percent=%d, inputIdx=%d, outputIdx=%d, amount=%ld%s\n", skip, range, percent, inputIdx, outputIdx, amount, percent ? "%" : "");
+            burn = (outputIdx == 31 && range == 0);
+            
+            printf("skip=%d, range=%d, percent=%d, inputIdx=%d, outputIdx=%d, burn=%d, amount=%ld%s\n", skip, range, percent, inputIdx, outputIdx, burn, amount, percent ? "%" : "");
             
             // Some asset went to output-index `idx`
-            if (outputIdx == idx)
-                return 1;
+            if (!burn && outputIdx == idx) return 1;
             if (skip) inputIdx++;
         }
     }
