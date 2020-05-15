@@ -237,6 +237,9 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
                     // If the tx contains an asset, we will skip the DUST transactions,
                     // otherwise there would be a chance of burning the received assets.
                     // Hence, skip adding the 600 dsatoshi transactions to the utxos.
+#if DEBUG
+                    printf("ASSETS: Checking %s:%d\n", u256hex(UInt256Reverse(tx->txHash)), j);
+#endif
                     if (BROutputIsAsset(tx, &tx->outputs[j])) {
                         array_add(wallet->assetUtxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                         continue;

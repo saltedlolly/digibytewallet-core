@@ -168,7 +168,9 @@ uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* outp
             
             burn = (outputIdx == 31 && range == 0);
             
-            printf("skip=%d, range=%d, percent=%d, inputIdx=%d, outputIdx=%d, burn=%d, amount=%ld%s\n", skip, range, percent, inputIdx, outputIdx, burn, amount, percent ? "%" : "");
+#if DEBUG
+            printf("ASSETS: skip=%d, range=%d, percent=%d, inputIdx=%d, outputIdx=%d, burn=%d, amount=%ld%s\n", skip, range, percent, inputIdx, outputIdx, burn, amount, percent ? "%" : "");
+#endif
             
             // Some asset went to output-index `idx`
             if (!burn && outputIdx == idx) return 1;
