@@ -246,6 +246,8 @@ int64_t BRBitcoinAmount(int64_t localAmount, double price);
 
 BRUTXO * BRGetUTXO(BRWallet *wallet);
 
+int BRWalletUtxoIsAsset(BRWallet* wallet, BRUTXO* utxo);
+
 int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index);
 
 int BRWalletUtxoSpendable(BRWallet* wallet, const char* txid, int index);

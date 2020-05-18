@@ -240,7 +240,7 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
 #if DEBUG
                     printf("ASSETS: Checking %s:%d\n", u256hex(UInt256Reverse(tx->txHash)), j);
 #endif
-                    if (BROutputIsAsset(tx, &tx->outputs[j])) {
+                    if (BRTxOutputIsAsset(tx, &tx->outputs[j])) {
                         array_add(wallet->assetUtxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
                         continue;
                     } else {
@@ -699,7 +699,7 @@ BRTransaction *BRWalletCreateTxForOutputsEx(BRWallet *wallet, const BRTxOutput o
         tx = BRSetGet(wallet->allTx, o);
         
         if (! tx || o->n >= tx->outCount) continue;
-        if (BROutputIsAsset(tx, o)) continue;
+        if (BRWalletUtxoIsAsset(wallet, o)) continue;
 
         BRTransactionAddInput(transaction, tx->txHash, o->n, tx->outputs[o->n].amount,
                               tx->outputs[o->n].script, tx->outputs[o->n].scriptLen, NULL, 0, NULL, 0, TXIN_SEQUENCE);

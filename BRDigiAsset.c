@@ -79,7 +79,7 @@ const sffcEntry sffcTable[] = {
 /*
  * Returns 1 if an asset was sent to the output
  */
-uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* output) {
+uint8_t BRTxOutputIsAsset(const BRTransaction* transaction, const BRTxOutput* output) {
     size_t idx = -1;
     size_t op_return_idx = -1;
     
