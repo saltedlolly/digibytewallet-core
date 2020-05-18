@@ -777,6 +777,47 @@ BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput out
     return BRWalletCreateTxForOutputsEx(wallet, outputs, outCount, 0);
 }
 
+int BRWalletGetAddressPrivateKey(BRWallet* wallet, BRKey* key, const char* address, size_t addressLen, const void *seed, size_t seedLen) {
+    assert(key != NULL && "Key must not be NULL");
+    
+    uint32_t j;
+    uint32_t j1;
+    
+    for (j = (uint32_t)array_count(wallet->internalChainSegwit); j > 0; j--) {
+        j1 = j - 1;
+        if (BRAddressEq(address, &wallet->internalChainSegwit[j1])) {
+            BRBIP32PrivKeyList(key, 1, seed, seedLen, SEQUENCE_INTERNAL_CHAIN, &j1);
+            return 1;
+        }
+    }
+    
+    for (j = (uint32_t)array_count(wallet->internalChain); j > 0; j--) {
+        j1 = j - 1;
+        if (BRAddressEq(address, &wallet->internalChain[j1])) {
+            BRBIP32PrivKeyList(key, 1, seed, seedLen, SEQUENCE_INTERNAL_CHAIN, &j1);
+            return 1;
+        }
+    }
+    
+    for (j = (uint32_t)array_count(wallet->externalChainSegwit); j > 0; j--) {
+        j1 = j - 1;
+        if (BRAddressEq(address, &wallet->externalChainSegwit[j1])) {
+            BRBIP32PrivKeyList(key, 1, seed, seedLen, SEQUENCE_EXTERNAL_CHAIN, &j1);
+            return 1;
+        }
+    }
+
+    for (j = (uint32_t)array_count(wallet->externalChain); j > 0; j--) {
+        j1 = j - 1;
+        if (BRAddressEq(address, &wallet->externalChain[j1])) {
+            BRBIP32PrivKeyList(key, 1, seed, seedLen, SEQUENCE_EXTERNAL_CHAIN, &j1);
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
 // signs any inputs in tx that can be signed using private keys from the wallet
 // forkId is 0 for bitcoin, 0x40 for b-cash
 // seed is the master private key (wallet seed) corresponding to the master public key given when the wallet was created
@@ -1398,6 +1439,15 @@ void BRFixAssetInputs(BRWallet *wallet, BRTransaction *assetTransaction)
             }
         }
     }
+}
+
+int BRWalletUtxoIsAsset(BRWallet* wallet, BRUTXO* utxo) {
+    for (int j = 0; j < array_count(wallet->assetUtxos); ++j) {
+        BRUTXO* assetUtxo = wallet->assetUtxos[j];
+        if (utxo == assetUtxo) return 1;
+    }
+    
+    return 0;
 }
 
 BRTransaction* BRGetTransactions(BRWallet *wallet)
