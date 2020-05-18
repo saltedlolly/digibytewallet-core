@@ -1443,8 +1443,9 @@ void BRFixAssetInputs(BRWallet *wallet, BRTransaction *assetTransaction)
 
 int BRWalletUtxoIsAsset(BRWallet* wallet, BRUTXO* utxo) {
     for (int j = 0; j < array_count(wallet->assetUtxos); ++j) {
-        BRUTXO* assetUtxo = wallet->assetUtxos[j];
-        if (utxo == assetUtxo) return 1;
+        BRUTXO* assetUtxo = &wallet->assetUtxos[j];
+        if (UInt256Eq(utxo->hash, assetUtxo->hash) && utxo->n == assetUtxo->n)
+            return 1;
     }
     
     return 0;
