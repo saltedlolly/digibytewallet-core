@@ -242,7 +242,7 @@ static void _BRWalletUpdateBalance(BRWallet *wallet)
 #endif
                     if (BRTxOutputIsAsset(tx, &tx->outputs[j])) {
                         array_add(wallet->assetUtxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
-                        continue;
+                        balance += 0;
                     } else {
                         // Add the UTXO to the internal list of utxos and add the balance
                         array_add(wallet->utxos, ((BRUTXO) { tx->txHash, (uint32_t)j }));
