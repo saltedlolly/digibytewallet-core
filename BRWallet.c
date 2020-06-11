@@ -592,11 +592,11 @@ size_t BRWalletAllAddrs(BRWallet *wallet, BRAddress addrs[], size_t addrsCount)
     pthread_mutex_lock(&wallet->lock);
     
     internalCountSegwit = (! addrs || array_count(wallet->internalChainSegwit) < rest) ?
-        array_count(wallet->internalChainSegwit) : rest;
+        array_count(wallet->internalChainSegwit) : (addrsCount / 4);
     rest -= internalCountSegwit;
     
     internalCount = (! addrs || array_count(wallet->internalChain) < rest) ?
-        array_count(wallet->internalChain) : rest;
+        array_count(wallet->internalChain) : (addrsCount / 4);
     rest -= internalCount;
 
     // Add the segwit addresses first
@@ -609,7 +609,7 @@ size_t BRWalletAllAddrs(BRWallet *wallet, BRAddress addrs[], size_t addrsCount)
         addrs[i + internalCountSegwit] = wallet->internalChain[i];
 
     externalCountSegwit = (! addrs || array_count(wallet->externalChainSegwit) < rest) ?
-        array_count(wallet->externalChainSegwit) : rest;
+        array_count(wallet->externalChainSegwit) : (addrsCount / 4);
     rest -= externalCountSegwit;
     
     externalCount = (! addrs || array_count(wallet->externalChain) < rest) ?
