@@ -161,7 +161,7 @@ uint8_t BRTxOutputIsAsset(const BRTransaction* transaction, const BRTxOutput* ou
         uint64_t amount = 0;
         uint8_t burn = 0;
         
-        while (ptr - or_output->script < or_output->scriptLen - 2 /* require at least two bytes */) {
+        while (ptr - or_output->script <= or_output->scriptLen - 1) {
             uint8_t flags = *ptr++;
             
             skip = !!(flags & (1 << 7));

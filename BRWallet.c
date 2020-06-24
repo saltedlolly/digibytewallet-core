@@ -1464,8 +1464,8 @@ BRUTXO* BRGetUTXO(BRWallet *wallet)
 int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index) {    
     UInt256 hash = UInt256Reverse(uint256(txid));
     
-    for (size_t j = array_count(wallet->assetUtxos); j > 0; j--) {
-        BRUTXO* utxo = &wallet->assetUtxos[j - 1];
+    for (size_t j = 0; j < array_count(wallet->assetUtxos); j++) {
+        BRUTXO* utxo = &wallet->assetUtxos[j];
         if (UInt256Eq(utxo->hash, hash) && utxo->n == index) return 1;
     }
     
