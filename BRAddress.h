@@ -36,6 +36,8 @@ extern "C" {
 
 #if BITCOIN_TESTNET
 #pragma message "testnet build"
+#else
+#pragma message "mainnet build"
 #endif
 
 // See https://en.bitcoin.it/wiki/List_of_address_prefixes and
@@ -43,7 +45,12 @@ extern "C" {
 #define DIGIBYTE_PUBKEY_LEGACY                30 // "D"
 #define DIGIBYTE_SCRIPT_ADDRESS_LEGACY        5  // "3"
 #define DIGIBYTE_SCRIPT_ADDRESS               63
+
+#if BITCOIN_TESTNET
+#define DIGIBYTE_PUBKEY_BECH32                "dgbt"
+#else
 #define DIGIBYTE_PUBKEY_BECH32                "dgb"
+#endif
     
 #define BITCOIN_PUBKEY_ADDRESS_TEST 111  //TODO: Replace these values when the testnet becomes available.
 #define BITCOIN_SCRIPT_ADDRESS_TEST 196  //TODO: Replace these values when the testnet becomes available.

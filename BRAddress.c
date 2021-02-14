@@ -364,7 +364,11 @@ size_t BRAddressScriptPubKey(uint8_t *script, size_t scriptLen, const char *addr
 {
     uint8_t pubkeyAddress = DIGIBYTE_PUBKEY_LEGACY, scriptAddress = DIGIBYTE_SCRIPT_ADDRESS, scriptAddressLegacy = DIGIBYTE_SCRIPT_ADDRESS_LEGACY;
     uint8_t data[42];
+#if BITCOIN_TESTNET
+    char hrp[84], bech32Prefix[] = "dgbt";
+#else
     char hrp[84], bech32Prefix[] = "dgb";
+#endif
     size_t dataLen, r = 0;
     
     assert(addr != NULL);
@@ -372,7 +376,6 @@ size_t BRAddressScriptPubKey(uint8_t *script, size_t scriptLen, const char *addr
 #if BITCOIN_TESTNET
     pubkeyAddress = BITCOIN_PUBKEY_ADDRESS_TEST;
     scriptAddress = BITCOIN_SCRIPT_ADDRESS_TEST;
-    bech32Prefix = "dgbt";
 #endif
     
     if (BRBase58CheckDecode(data, sizeof(data), addr) == 21) {
