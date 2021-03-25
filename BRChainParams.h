@@ -46,23 +46,15 @@ typedef struct {
 } BRChainParams;
 
 static const char *BRMainNetDNSSeeds[] = {
-        "seed.digibyteservers.io",
-        "seed2.hashdragon.com",
-        "dgb.cryptoservices.net",
         "digiexplorer.info",
-        "seed1.digibyte.io",
-        "seed2.digibyte.io",
-        "seed3.digibyte.io",
-        "digihash.co", NULL
+        "dgb1.trezor.io",
+        "digibyteblockexplorer.com",
+        "digibyte.host", NULL
 };
 
 static const char *BRTestNetDNSSeeds[] = {
-        "digiexplorer.info",
-		"digihash.co",
-		"seed.digibyte.io",
-        "seed1.digibyte.io",
-        "seed2.digibyte.io",
-        "seed3.digibyte.io", NULL
+        "testnet-1.us.digibyteservers.io",
+        "testnetexplorer.digibyteservers.io", NULL
 };
 
 // blockchain checkpoints - these are also used as starting points for partial chain downloads, so they must be at
