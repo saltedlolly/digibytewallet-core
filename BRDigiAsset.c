@@ -79,7 +79,7 @@ const sffcEntry sffcTable[] = {
 /*
  * Returns 1 if an asset was sent to the output
  */
-uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* output) {
+uint8_t BRTxOutputIsAsset(const BRTransaction* transaction, const BRTxOutput* output) {
     size_t idx = -1;
     size_t op_return_idx = -1;
     
@@ -113,20 +113,55 @@ uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* outp
     ptr++;
     
     type = *ptr;
+    ptr++;
     
-    if (!DA_IS_TRANSFER(type)) {
-        return 0;
+    if ((type & 0x0F) < 5) {
+        // Has metadata
+        ptr += 20 /* SHA1 Torrent Hash */;
+        ptr += 32 /* SHA256 of metadata */;
+        // ToDo: Think about extracting those
+    }
+    
+    if (!DA_IS_BURN(type) && !DA_IS_TRANSFER(type)) {
+        // Issuance, parse Amount
+        uint64_t amount = 0;
+        
+        uint8_t flagsLen = (*ptr & 0xe0) >> 5;
+        if (flagsLen & 0x0F == 0x07) flagsLen = 6;
+        
+        assert(flagsLen <= 6 && "sffc out of range");
+        sffcEntry* data = &sffcTable[flagsLen];
+        amount = UInt64GetBE(ptr); // safe because scriptLen (64) is after script
+        ptr += data->byteSize;
+        
+        // mask flag bits
+        for (uint8_t mask0 = 0; mask0 < data->skipBits; ++mask0) {
+            uint64_t mask = (1UL << (63 - mask0));
+            amount &= ~mask;
+        }
+        
+        // shift bits to the LSB
+        amount >>= (64 - data->byteSize * 8);
+        
+        uint64_t expShift = pow(2, data->exponent);
+        uint64_t exp = amount % expShift;
+        uint64_t mantis = amount / expShift;
+        amount = mantis * pow(10, exp);
+        
+#if DEBUG
+            printf("ISSUED ASSET: amount=%d\n", amount);
+#endif
     }
     
     {
-        // Parse the instructions
+        // Parse the transfer instructions
         uint16_t outputIdx;
         uint8_t inputIdx = 0;
         uint8_t skip = 0, range = 0, percent = 0;
         uint64_t amount = 0;
+        uint8_t burn = 0;
         
-        ++ptr;
-        while (ptr - or_output->script < or_output->scriptLen - 1) {
+        while (ptr - or_output->script <= or_output->scriptLen - 1) {
             uint8_t flags = *ptr++;
             
             skip = !!(flags & (1 << 7));
@@ -165,11 +200,14 @@ uint8_t BROutputIsAsset(const BRTransaction* transaction, const BRTxOutput* outp
                 amount = mantis * pow(10, exp);
             }
             
-            printf("skip=%d, range=%d, percent=%d, inputIdx=%d, outputIdx=%d, amount=%ld%s\n", skip, range, percent, inputIdx, outputIdx, amount, percent ? "%" : "");
+            burn = (outputIdx == 31 && range == 0);
+            
+#if DEBUG
+            printf("ASSETS: skip=%d, range=%d, percent=%d, inputIdx=%d, outputIdx=%d, burn=%d, amount=%ld%s\n", skip, range, percent, inputIdx, outputIdx, burn, amount, percent ? "%" : "");
+#endif
             
             // Some asset went to output-index `idx`
-            if (outputIdx == idx)
-                return 1;
+            if (!burn && outputIdx == idx) return 1;
             if (skip) inputIdx++;
         }
     }
