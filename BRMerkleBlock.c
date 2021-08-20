@@ -138,6 +138,8 @@ BRMerkleBlock *BRMerkleBlockParse(const uint8_t *buf, size_t bufLen)
         
         BRSHA256_2(&block->blockHash, buf, 80);
 
+	return block;
+
         switch (block->version & BLOCK_VERSION_ALGO) {
             case BLOCK_VERSION_SHA256D:
                 // void BRSHA256_2(void *md32, const void *data, size_t len)

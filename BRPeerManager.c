@@ -46,6 +46,10 @@
 
 #define genesis_block_hash(params) UInt256Reverse((params)->checkpoints[0].hash)
 
+#ifndef BITCOIN_TESTNET
+#define BITCOIN_TESTNET 0
+#endif
+
 // Since many users experience data corruption issues on iOS, we
 //  implement the following procedure in order to prevent the issues.
 // We will pass 0xAAAAAAAAAAAAAAAA to the native side (iOS/android), which will then check its value before saving the blocks.
@@ -1688,6 +1692,8 @@ BRPeerManager *BRPeerManagerNewEx(const BRChainParams *params, BRWallet *wallet,
         manager->lastBlock = startSyncFrom;
     }
     
+    printf("BITCOIN_TESTNET=%d\n", BITCOIN_TESTNET);
+    
     printf("Starting sync from height: %d\n", manager->lastBlock->height);
     printf("Starting sync from timestamp: %d\n", manager->lastBlock->timestamp);
     
@@ -2122,9 +2128,9 @@ void BRPeerManagerFree(BRPeerManager *manager)
     BRSetApply(manager->orphans, NULL, _setApplyFreeBlock);
     BRSetFree(manager->orphans);
     BRSetFree(manager->checkpoints);
-    for (size_t i = array_count(manager->txRelays); i > 0; i--) free(manager->txRelays[i - 1].peers);
+    for (size_t i = array_count(manager->txRelays); i > 0; i--) array_free(manager->txRelays[i - 1].peers);
     array_free(manager->txRelays);
-    for (size_t i = array_count(manager->txRequests); i > 0; i--) free(manager->txRequests[i - 1].peers);
+    for (size_t i = array_count(manager->txRequests); i > 0; i--) array_free(manager->txRequests[i - 1].peers);
     array_free(manager->txRequests);
     array_free(manager->publishedTx);
     array_free(manager->publishedTxHashes);

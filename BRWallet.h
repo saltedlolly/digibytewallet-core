@@ -169,6 +169,8 @@ BRTransaction *BRWalletCreateTransaction(BRWallet *wallet, uint64_t amount, cons
 // result must be freed using BRTransactionFree()
 BRTransaction *BRWalletCreateTxForOutputs(BRWallet *wallet, const BRTxOutput outputs[], size_t outCount);
 
+int BRWalletGetAddressPrivateKey(BRWallet* wallet, BRKey* key, const char* address, size_t addressLen, const void *seed, size_t seedLen);
+
 // signs any inputs in tx that can be signed using private keys from the wallet
 // forkId is 0 for bitcoin, 0x40 for b-cash
 // seed is the master private key (wallet seed) corresponding to the master public key given when the wallet was created
@@ -246,7 +248,13 @@ int64_t BRBitcoinAmount(int64_t localAmount, double price);
 
 BRUTXO * BRGetUTXO(BRWallet *wallet);
 
+int BRWalletUtxoIsAsset(BRWallet* wallet, BRUTXO* utxo);
+
 int BRWalletHasAssetUtxo(BRWallet* wallet, const char* txid, int index);
+
+int BRWalletUtxoSpendable(BRWallet* wallet, const char* txid, int index);
+
+void BRWalletPrintUtxos(BRWallet* wallet);
 
 BRTransaction* BRGetTransactions(BRWallet *wallet);
 
