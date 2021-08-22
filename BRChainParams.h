@@ -46,20 +46,10 @@ typedef struct {
 } BRChainParams;
 
 static const char *BRMainNetDNSSeeds[] = {
-        "seed.digibyte.io", // Jared Tate
-        "seed.digihash.co", // Jared Tate
-        "dnsseed.esotericizm.site", // DigiContributor
-        "seed.digiexplorer.info", // DigiByte Foundation
-        "seed.digiassets.net", // DigiByte Foundation
-        "digibyteblockexplorer.com", // DigiByte Block Explorer
-        "dgb1.trezor.io", // Trezor
-        "seed2.digibyte.io", // Jared Tate
-        "seed3.digibyte.io", // Jared Tate
-        "seed.digibyteblockchain.com", // JS555
-        "seed.digibyte.host", // SashaD
-        "seed.digibytefoundation.org", // DigiByte Foundation
-        "seed.digibyte.org", // Website collective
-        "seed.digibyteservers.io", NULL // ChillingSilence
+        "digiexplorer.info",
+        "dgb1.trezor.io",
+        "digibyteblockexplorer.com",
+        "digibyte.host", NULL
 };
 
 static const char *BRTestNetDNSSeeds[] = {
