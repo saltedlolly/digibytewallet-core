@@ -47,21 +47,14 @@ typedef struct {
 
 static const char *BRMainNetDNSSeeds[] = {
         "seed.digibyte.io", // Jared Tate
+        "seed.digibyte.org", // Website collective
         "seed.digihash.co", // Jared Tate
-        "dnsseed.esotericizm.site", // DigiContributor
-        "seed.digiexplorer.info", // DigiByte Foundation
         "seed.digiassets.net", // DigiByte Foundation
-        "digibyteblockexplorer.com", // DigiByte Block Explorer
-        "dgb1.trezor.io", // Trezor
+        "digibyte.host", // SashaD
+        "seed.digiexplorer.info", // DigiByte Foundation
         "seed2.digibyte.io", // Jared Tate
         "seed3.digibyte.io", // Jared Tate
-        "seed.digibyteblockchain.com", // JS555
-        "seed.digibyte.host", // SashaD
-        "seed.digibytefoundation.org", // DigiByte Foundation
-        "seed.digibyte.org", // Website collective
-        "seed.digibyteservers.io",
-        "dgb.quakeguy.com", // Quakeitup
-        NULL // ChillingSilence
+        "dgb.quakeguy.com"  NULL // Quakeitup 
 };
 
 static const char *BRTestNetDNSSeeds[] = {
@@ -100,7 +93,15 @@ static const BRCheckPoint BRMainNetCheckpoints[] = {
         { 6227953, uint256("04a2e7f5ed5017dc45ee0627c1ed446f5331c290dc43e2febaa30e81fa280888"), 1520747973, 0x1a621a03 },
         { 6256573, uint256("2b3d16a3a14eadcbaa977b8e8c41fc56140fee024c70047bfc18bef2d1ffa756"), 1521172890, 0x1a662f3c },
         { 6268500, uint256("00000000000000068c5b2c3515cf1fee4ff0fba92426cc6dad28e6ed9298f36a"), 1521349185, 0x190b32a3 },
-        { 6309234, uint256("86f360c347d61a1015e901ffcc54a0692af7267e06b64191aa21be988368673d"), 1521953988, 0x1a2bb5ea }
+        { 6309234, uint256("86f360c347d61a1015e901ffcc54a0692af7267e06b64191aa21be988368673d"), 1521953988, 0x1a2bb5ea }.
+        { 7000000, uint256("03c6664b250c3e3b688f5779ce791384b35acaa38c4461f0458a4674bd762f63"), 1532239864, 0x1a117058 }.
+        { 8000000, uint256("1af919cb004bb05c369a862cb5ded70aaa123d0eac2432ceec859f6f42880660"), 1547155779, 0x1b01d883 }.
+        { 9000000, uint256("942b62f60ae25478d6ee41ec498daefc306cf6f93ff500435a12aa6fe3750220"), 1562079462, 0x1a07d618 }.
+        { 10000000, uint256("9e382e2ae1909a4f20c40f38bc7b9f5d0222d5f92ed8be9c04238209c88d55b7"), 1577042521, 0x1b00eb79 }.
+        { 11000000, uint256("0f4ad10ae49b504246c0175f6cbab9b0f91b6568a88931e6341a83a731701054"), 1591976167, 0x1b008be8 }.
+        { 12000000, uint256("0000000000000000e231d6676909d4d54296d640d996453b6778cc8081239c1f"), 1606947788, 0x19029b4f }.
+        { 13000000, uint256("a4c1069938986237270340fa9118e839e9a4b614fddf57b3d51e988ab357c13f"), 1621883565, 0x1a09f428 }.
+        { 13510000, uint256("e41f3bbb0668b4db50682506e131d4f6c31fbf66be58d03d35a5dc30fed5432a"), 1629510979, 0x1a24afff }
 
 };
 
