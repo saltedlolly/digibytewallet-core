@@ -59,7 +59,9 @@ static const char *BRMainNetDNSSeeds[] = {
         "seed.digibyte.host", // SashaD
         "seed.digibytefoundation.org", // DigiByte Foundation
         "seed.digibyte.org", // Website collective
-        "seed.digibyteservers.io", NULL // ChillingSilence
+        "seed.digibyteservers.io",
+        "dgb.quakeguy.com", // Quakeitup
+        NULL // ChillingSilence
 };
 
 static const char *BRTestNetDNSSeeds[] = {
