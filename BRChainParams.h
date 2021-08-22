@@ -61,6 +61,7 @@ static const char *BRMainNetDNSSeeds[] = {
         "seed.digibyte.org", // Website collective
         "seed.digibyteservers.io",
         "dgb.quakeguy.com", // Quakeitup
+        "dnsseed.lifehash.com", // LifeHash
         NULL // ChillingSilence
 };
 
