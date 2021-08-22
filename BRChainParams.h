@@ -48,6 +48,7 @@ typedef struct {
 static const char *BRMainNetDNSSeeds[] = {
         "seed.digibyte.io", // Jared Tate
         "seed.digibyte.org", // Website collective
+        "dnsseed.lifehash.com", // LifeHash
         "seed.digihash.co", // Jared Tate
         "seed.digiassets.net", // DigiByte Foundation
         "digibyte.host", // SashaD
