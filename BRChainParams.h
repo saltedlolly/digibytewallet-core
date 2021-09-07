@@ -55,7 +55,8 @@ static const char *BRMainNetDNSSeeds[] = {
         "seed.digiexplorer.info", // DigiByte Foundation
         "seed2.digibyte.io", // Jared Tate
         "seed3.digibyte.io", // Jared Tate
-        "dgb.quakeguy.com",  NULL // Quakeitup 
+        "dgb.quakeguy.com",  NULL // Quakeitup
+        "seed.digibyte.help", // Olly Stedall @saltedlolly 
 };
 
 static const char *BRTestNetDNSSeeds[] = {
